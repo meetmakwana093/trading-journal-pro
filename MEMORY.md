@@ -1,0 +1,1 @@
+- [Review page tabs fix](review-page-tabs-fix.md) — Fixed ReviewPage.jsx to show DAILY REVIEW and MONTHLY REVIEW tabs
