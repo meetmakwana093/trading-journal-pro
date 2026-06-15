@@ -8,9 +8,9 @@ app.use(express.json());
 
 // 1. CONNECT TO MYSQL
 const pool = mysql.createPool({
-  host: 'localhost',
-  user: 'root',
-  password: 'meet@5207',
+  host: '103.212.121.69',
+  user: 'trade_journal_user',
+  password: 'MySql@122333',
   database: 'trade_journal',
   port: 3306,
   waitForConnections: true,
