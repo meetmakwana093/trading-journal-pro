@@ -13,37 +13,49 @@ const API = 'http://localhost:5000/api';
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
  
+  // CALENDAR NAVIGATION STATE
+  const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
+  const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
+ 
   // 1. THIS IS THE BRAIN: Load trades from PostgreSQL backend
   const [trades, setTrades] = useState([]);
+ 
+  const parseTags = (tags) => {
+    if (Array.isArray(tags)) return tags;
+    if (typeof tags === 'string' && tags.trim() !== '') return tags.split(',').map(t => t.trim());
+    return [];
+  };
+ 
+  const formatTradeData = (data) => {
+    return {
+      id: data.id,
+      symbol: data.symbol,
+      entryPrice: parseFloat(data.entryPrice !== undefined ? data.entryPrice : data.entry_price) || 0,
+      exitPrice: parseFloat(data.exitPrice !== undefined ? data.exitPrice : data.exit_price) || 0,
+      profitLoss: parseFloat(data.profitLoss !== undefined ? data.profitLoss : data.profit_loss) || 0,
+      entryTime: data.entryTime || data.entry_time,
+      session: data.session || '',
+      direction: data.direction || '',
+      followedPlan: data.followedPlan !== undefined ? data.followedPlan : data.followed_plan,
+      rating: data.rating || 5,
+      mistakes: data.mistakes || '',
+      wentRight: data.wentRight || data.went_right || '',
+      entryWindow: data.entryWindow || data.entry_window || '',
+      model: data.model || '',
+      positiveTags: parseTags(data.positiveTags || data.positive_tags),
+      negativeTags: parseTags(data.negativeTags || data.negative_tags),
+      account: data.account || '',
+      be: data.be || false,
+      win: (parseFloat(data.profitLoss !== undefined ? data.profitLoss : data.profit_loss) || 0) > 0
+    };
+  };
  
   // 2. Fetch trades from backend on app load
   useEffect(() => {
     fetch(`${API}/trades`)
       .then(res => res.json())
       .then(data => {
-        // Map snake_case DB columns to camelCase for frontend
-        const mapped = data.map(t => ({
-          id: t.id,
-          symbol: t.symbol,
-          entryPrice: parseFloat(t.entry_price),
-          exitPrice: parseFloat(t.exit_price),
-          profitLoss: parseFloat(t.profit_loss),
-          entryTime: t.entry_time,
-          session: t.session,
-          direction: t.direction,
-          followedPlan: t.followed_plan,
-          rating: t.rating,
-          mistakes: t.mistakes,
-          wentRight: t.went_right,
-          // --- FIXED: ADDED THE MISSING COLUMNS HERE ---
-          entryWindow: t.entry_window,
-          model: t.model,
-          positiveTags: t.positive_tags ? t.positive_tags.split(',').map(tag => tag.trim()).filter(Boolean) : [],
-          negativeTags: t.negative_tags ? t.negative_tags.split(',').map(tag => tag.trim()).filter(Boolean) : [],
-          account: t.account,
-          be: t.be
-        }));
-        setTrades(mapped);
+        setTrades(data.map(formatTradeData));
       })
       .catch(err => console.error('Failed to fetch trades:', err));
   }, []);
@@ -57,28 +69,7 @@ export default function App() {
     })
       .then(res => res.json())
       .then(saved => {
-        const mapped = {
-          id: saved.id,
-          symbol: saved.symbol,
-          entryPrice: parseFloat(saved.entry_price),
-          exitPrice: parseFloat(saved.exit_price),
-          profitLoss: parseFloat(saved.profit_loss),
-          entryTime: saved.entry_time,
-          session: saved.session,
-          direction: saved.direction,
-          followedPlan: saved.followed_plan,
-          rating: saved.rating,
-          mistakes: saved.mistakes,
-          wentRight: saved.went_right,
-          // --- FIXED: ADDED THE MISSING COLUMNS HERE ---
-          entryWindow: saved.entry_window,
-          model: saved.model,
-          positiveTags: saved.positive_tags ? saved.positive_tags.split(',').map(tag => tag.trim()).filter(Boolean) : [],
-          negativeTags: saved.negative_tags ? saved.negative_tags.split(',').map(tag => tag.trim()).filter(Boolean) : [],
-          account: saved.account,
-          be: saved.be
-        };
-        setTrades((prevTrades) => [mapped, ...prevTrades]);
+        setTrades((prevTrades) => [formatTradeData(saved), ...prevTrades]);
       })
       .catch(err => console.error('Failed to add trade:', err));
   };
@@ -99,30 +90,29 @@ export default function App() {
     })
       .then(res => res.json())
       .then(saved => {
-        const mapped = {
-          id: saved.id,
-          symbol: saved.symbol,
-          entryPrice: parseFloat(saved.entry_price),
-          exitPrice: parseFloat(saved.exit_price),
-          profitLoss: parseFloat(saved.profit_loss),
-          entryTime: saved.entry_time,
-          session: saved.session,
-          direction: saved.direction,
-          followedPlan: saved.followed_plan,
-          rating: saved.rating,
-          mistakes: saved.mistakes,
-          wentRight: saved.went_right,
-          // --- FIXED: ADDED THE MISSING COLUMNS HERE ---
-          entryWindow: saved.entry_window,
-          model: saved.model,
-          positiveTags: saved.positive_tags ? saved.positive_tags.split(',').map(tag => tag.trim()).filter(Boolean) : [],
-          negativeTags: saved.negative_tags ? saved.negative_tags.split(',').map(tag => tag.trim()).filter(Boolean) : [],
-          account: saved.account,
-          be: saved.be
-        };
+        const mapped = formatTradeData(saved);
         setTrades((prevTrades) => prevTrades.map(trade => trade.id === mapped.id ? mapped : trade));
       })
       .catch(err => console.error('Failed to update trade:', err));
+  };
+ 
+  // CALENDAR NAVIGATION HANDLERS
+  const handlePrevMonth = () => {
+    if (calendarMonth === 0) {
+      setCalendarMonth(11);
+      setCalendarYear(y => y - 1);
+    } else {
+      setCalendarMonth(m => m - 1);
+    }
+  };
+ 
+  const handleNextMonth = () => {
+    if (calendarMonth === 11) {
+      setCalendarMonth(0);
+      setCalendarYear(y => y + 1);
+    } else {
+      setCalendarMonth(m => m + 1);
+    }
   };
  
   const tabs = [
@@ -144,17 +134,12 @@ export default function App() {
     const losingTrades = trades.filter(t => t.profitLoss < 0);
     const winning = winningTrades.length;
     const losing = losingTrades.length;
- 
     const winRate = (winning / total) * 100;
- 
     const totalPnL = trades.reduce((sum, t) => sum + t.profitLoss, 0);
     const returns = (totalPnL / 10000) * 100;
- 
     const grossProfit = winningTrades.reduce((sum, t) => sum + t.profitLoss, 0);
     const grossLoss = Math.abs(losingTrades.reduce((sum, t) => sum + t.profitLoss, 0));
- 
     const profitFactor = grossLoss === 0 ? 0 : grossProfit / grossLoss;
- 
     const sortedTrades = [...trades].sort((a, b) => new Date(a.entryTime) - new Date(b.entryTime));
     let cumulative = 0;
     let peak = 0;
@@ -165,10 +150,8 @@ export default function App() {
       const drawdown = peak === 0 ? 0 : ((peak - cumulative) / peak) * 100;
       if (drawdown > maxDrawdown) maxDrawdown = drawdown;
     });
- 
     const avgWin = winning === 0 ? 0 : grossProfit / winning;
     const avgLoss = losing === 0 ? 0 : grossLoss / losing;
- 
     return {
       winRate: parseFloat(winRate.toFixed(2)),
       totalPnL: parseFloat(totalPnL.toFixed(2)),
@@ -248,7 +231,6 @@ export default function App() {
       if (!grouped[date]) grouped[date] = 0;
       grouped[date] += t.profitLoss;
     });
- 
     const calendarData = {};
     for (const [date, pnl] of Object.entries(grouped)) {
       let color = 'darkgray';
@@ -276,6 +258,13 @@ export default function App() {
   const symbolData = Object.entries(calculateSymbolPerformance(trades)).map(([symbol, pnl]) => ({ symbol, pnl }));
   const dowData = calculateDOWPerformance(trades);
  
+  // CALENDAR VARS - NOW DYNAMIC BASED ON STATE
+  const currentMonth = calendarMonth;
+  const currentYear = calendarYear;
+  const currentMonthName = new Date(calendarYear, calendarMonth).toLocaleString('default', { month: 'long' });
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
+ 
   const profileData = [
     { subject: 'Win Rate', A: metrics.winRate, fullMark: 100 },
     { subject: 'Plan Adherence', A: trades.length ? (trades.filter(t => t.followedPlan !== false).length / trades.length) * 100 : 0, fullMark: 100 },
@@ -283,13 +272,6 @@ export default function App() {
     { subject: 'Profit Factor', A: Math.min((metrics.profitFactor / 3) * 100, 100), fullMark: 100 },
     { subject: 'Recovery Factor', A: Math.min((calculateRecoveryFactor(trades) / 3) * 100, 100), fullMark: 100 },
   ];
- 
-  const currentDateObj = new Date();
-  const currentYear = currentDateObj.getFullYear();
-  const currentMonth = currentDateObj.getMonth();
-  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-  const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay(); 
-  const currentMonthName = currentDateObj.toLocaleString('default', { month: 'long' });
  
   return (
     <div className="App">
@@ -311,7 +293,6 @@ export default function App() {
       {/* MAIN CONTENT AREA */}
       <div className="main-content">
         
-        {/* CONDITIONAL LAYOUT: 3-Columns for Home, Full Width for Everything Else */}
         {activeTab === 'home' ? (
           <>
             {/* Left Column (25%) */}
@@ -419,8 +400,30 @@ export default function App() {
                 </motion.div>
               </motion.div>
     
+              {/* CALENDAR - NOW WITH NAVIGATION */}
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '12px', padding: '20px' }}>
-                <h3 style={{ color: '#00FF88', margin: '0 0 15px 0', fontSize: '1.1rem' }}>📅 Trading Calendar - {currentMonthName} {currentYear}</h3>
+                
+                {/* CALENDAR HEADER WITH PREV/NEXT BUTTONS */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
+                  <button
+                    onClick={handlePrevMonth}
+                    style={{ background: 'rgba(0,255,136,0.1)', border: '1px solid rgba(0,255,136,0.3)', color: '#00FF88', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold', transition: 'all 0.2s' }}
+                    onMouseEnter={e => e.target.style.background = 'rgba(0,255,136,0.25)'}
+                    onMouseLeave={e => e.target.style.background = 'rgba(0,255,136,0.1)'}
+                  >←</button>
+ 
+                  <h3 style={{ color: '#00FF88', margin: 0, fontSize: '1.1rem' }}>
+                    📅 {currentMonthName} {currentYear}
+                  </h3>
+ 
+                  <button
+                    onClick={handleNextMonth}
+                    style={{ background: 'rgba(0,255,136,0.1)', border: '1px solid rgba(0,255,136,0.3)', color: '#00FF88', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold', transition: 'all 0.2s' }}
+                    onMouseEnter={e => e.target.style.background = 'rgba(0,255,136,0.25)'}
+                    onMouseLeave={e => e.target.style.background = 'rgba(0,255,136,0.1)'}
+                  >→</button>
+                </div>
+ 
                 <div className="calendar-header">
                   {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
                     <div key={index}>{day}</div>
