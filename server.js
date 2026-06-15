@@ -119,6 +119,59 @@ app.put('/api/trades/:id', async (req, res) => {
   }
 });
 
+// POST A NEW TRADE
+app.post('/api/trades', async (req, res) => {
+  const { 
+    symbol, entryPrice, exitPrice, profitLoss, entryTime, session, direction, 
+    followedPlan, rating, mistakes, wentRight, entryWindow, model, 
+    positiveTags, negativeTags, account, be 
+  } = req.body;
+  
+  const posTagsStr = Array.isArray(positiveTags) ? positiveTags.join(',') : '';
+  const negTagsStr = Array.isArray(negativeTags) ? negativeTags.join(',') : '';
+
+  // Convert React's ISO Date into a strict MySQL Date format
+  let mysqlEntryTime;
+  try {
+    mysqlEntryTime = new Date(entryTime).toISOString().slice(0, 19).replace('T', ' ');
+  } catch (e) {
+    mysqlEntryTime = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  }
+
+  try {
+    const [result] = await pool.query(
+      `INSERT INTO trades 
+      (symbol, entry_price, exit_price, profit_loss, entry_time, session, direction, followed_plan, rating, mistakes, went_right, entry_window, model, positive_tags, negative_tags, account, be) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        symbol || 'UNKNOWN', 
+        entryPrice || 0,        // 🟢 If missing, force it to 0
+        exitPrice || 0,         // 🟢 If missing, force it to 0
+        profitLoss || 0, 
+        mysqlEntryTime, 
+        session || '', 
+        direction || '', 
+        followedPlan ? 1 : 0, 
+        rating || 5, 
+        mistakes || '', 
+        wentRight || '', 
+        entryWindow || '',      // 🟢 Force empty strings instead of null
+        model || '', 
+        posTagsStr, 
+        negTagsStr, 
+        account || '', 
+        be ? 1 : 0
+      ]
+    );
+    
+    // Fetch the newly created row
+    const [newRow] = await pool.query('SELECT * FROM trades WHERE id = ?', [result.insertId]);
+    res.json(mapDBToReact(newRow[0]));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Start the server
 const PORT = 5000;
 app.listen(PORT, () => {
