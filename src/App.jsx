@@ -8,7 +8,7 @@ import MissedTradeDB from './pages/MissedTradeDB.jsx';
 import TradesDB from './pages/TradeDB.jsx';
 import './App.css';
  
-const API = 'https://trading-journal-pro-three.vercel.app/api';
+const API = 'https://trading-journal-pro-e732.onrender.com/api';
  
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
