@@ -8,7 +8,9 @@ import MissedTradeDB from './pages/MissedTradeDB.jsx';
 import TradesDB from './pages/TradeDB.jsx';
 import './App.css';
  
-const API = 'https://trading-journal-pro-e732.onrender.com/api';
+// 🔴 THE CRITICAL FIX: This uses your Vercel Environment Variable. 
+// If it fails, it falls back to localhost for local testing.
+const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
  
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
@@ -17,7 +19,7 @@ export default function App() {
   const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
  
-  // 1. THIS IS THE BRAIN: Load trades from PostgreSQL backend
+  // 1. THIS IS THE BRAIN: Load trades from MySQL backend
   const [trades, setTrades] = useState([]);
  
   const parseTags = (tags) => {
@@ -55,9 +57,14 @@ export default function App() {
     fetch(`${API}/trades`)
       .then(res => res.json())
       .then(data => {
-        setTrades(data.map(formatTradeData));
+        // Prevent crashing if server returns an error object instead of an array
+        if (Array.isArray(data)) {
+          setTrades(data.map(formatTradeData));
+        } else {
+          console.error("Backend did not return an array:", data);
+        }
       })
-      .catch(err => console.error('Failed to fetch trades:', err));
+      .catch(err => console.error('Failed to fetch trades. Check backend connection:', err));
   }, []);
  
   // 3. Functions to modify the brain's data
@@ -67,11 +74,24 @@ export default function App() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newTrade),
     })
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+        return res.json();
+      })
       .then(saved => {
+        // 🔴 SAFETY BLOCK: Prevent "Ghost Rows" from appearing
+        if (!saved || Object.keys(saved).length === 0 || !saved.symbol) {
+          alert("⚠️ Database Error: The server returned empty data. Check your Backend URL or MySQL Connection.");
+          console.error("Invalid Backend Response:", saved);
+          return;
+        }
+        // If data is good, add it to the UI
         setTrades((prevTrades) => [formatTradeData(saved), ...prevTrades]);
       })
-      .catch(err => console.error('Failed to add trade:', err));
+      .catch(err => {
+        console.error('Failed to add trade:', err);
+        alert("⚠️ Connection Error: Could not reach the database backend.");
+      });
   };
  
   const handleDeleteTrade = (idToDelete) => {
@@ -90,6 +110,7 @@ export default function App() {
     })
       .then(res => res.json())
       .then(saved => {
+        if (!saved || !saved.symbol) return; // Prevent corrupting data on update
         const mapped = formatTradeData(saved);
         setTrades((prevTrades) => prevTrades.map(trade => trade.id === mapped.id ? mapped : trade));
       })
