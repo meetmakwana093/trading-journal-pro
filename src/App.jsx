@@ -68,20 +68,29 @@ export default function App() {
   }, []);
  
   // 3. Functions to modify the brain's data
+  // 3. Functions to modify the brain's data
   const handleAddTrade = (newTrade) => {
+    
+    // 🟢 THE FIX: We automatically attach a 0 for the prices so MySQL doesn't crash!
+    const safeTrade = {
+      entryPrice: 0,
+      exitPrice: 0,
+      ...newTrade
+    };
+
     fetch(`${API}/trades`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newTrade),
+      body: JSON.stringify(safeTrade),
     })
       .then(res => {
         if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
         return res.json();
       })
       .then(saved => {
-        // 🔴 SAFETY BLOCK: Prevent "Ghost Rows" from appearing
+        // SAFETY BLOCK: Prevent "Ghost Rows" from appearing
         if (!saved || Object.keys(saved).length === 0 || !saved.symbol) {
-          alert("⚠️ Database Error: The server returned empty data. Check your Backend URL or MySQL Connection.");
+          alert("⚠️ Database Error: The server returned empty data.");
           console.error("Invalid Backend Response:", saved);
           return;
         }
