@@ -1,35 +1,37 @@
 import express from 'express';
 import cors from 'cors';
-import pkg from 'pg';
-const { Pool } = pkg;
- 
+import mysql from 'mysql2/promise';
+
 const app = express();
 app.use(cors());
 app.use(express.json());
- 
-// 1. CONNECT TO POSTGRESQL
-const pool = new Pool({
-  user: 'postgres',
+
+// 1. CONNECT TO MYSQL
+const pool = mysql.createPool({
   host: 'localhost',
-  database: 'trade_journal',
+  user: 'root',
   password: 'meet@5207',
-  port: 5432,
+  database: 'trade_journal',
+  port: 3306,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
 });
- 
-pool.connect()
-  .then(() => console.log('✅ Successfully connected to PostgreSQL database!'))
+
+pool.getConnection()
+  .then(() => console.log('✅ Successfully connected to MySQL database!'))
   .catch(err => console.error('❌ Database connection error', err.stack));
- 
+
 // 2. GET ALL TRADES
 app.get('/api/trades', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM trades ORDER BY entry_time DESC');
-    res.json(result.rows);
+    const [rows] = await pool.query('SELECT * FROM trades ORDER BY entry_time DESC');
+    res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
- 
+
 // 3. POST A NEW TRADE
 app.post('/api/trades', async (req, res) => {
   const {
@@ -38,15 +40,14 @@ app.post('/api/trades', async (req, res) => {
     rating, mistakes, wentRight,
     entryWindow, model, positiveTags, negativeTags, account, be
   } = req.body;
- 
+
   try {
-    const result = await pool.query(
+    const [result] = await pool.query(
       `INSERT INTO trades
       (symbol, entry_price, exit_price, profit_loss, entry_time, session,
        direction, followed_plan, rating, mistakes, went_right,
        entry_window, model, positive_tags, negative_tags, account, be)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
-      RETURNING *`,
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         symbol, entryPrice, exitPrice, profitLoss,
         entryTime, session, direction, followedPlan,
@@ -57,25 +58,29 @@ app.post('/api/trades', async (req, res) => {
         account, be
       ]
     );
-    res.json(result.rows[0]);
+    const insertId = result.insertId;
+    const [rows] = await pool.query('SELECT * FROM trades WHERE id = ?', [insertId]);
+    res.json(rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
- 
+
 // 4. DELETE A TRADE
 app.delete('/api/trades/:id', async (req, res) => {
   try {
-    const result = await pool.query('DELETE FROM trades WHERE id = $1 RETURNING *', [req.params.id]);
-    if (result.rowCount === 0) {
+    const [result] = await pool.query('DELETE FROM trades WHERE id = ?', [req.params.id]);
+    if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Trade not found' });
     }
-    res.json(result.rows[0]);
+    // For delete, we could return the deleted object, but we don't have it.
+    // We'll fetch before delete if needed; for simplicity return success.
+    res.json({ message: 'Trade deleted', id: req.params.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
- 
+
 // 5. UPDATE A TRADE
 app.put('/api/trades/:id', async (req, res) => {
   const {
@@ -84,16 +89,16 @@ app.put('/api/trades/:id', async (req, res) => {
     rating, mistakes, wentRight,
     entryWindow, model, positiveTags, negativeTags, account, be
   } = req.body;
- 
+
   try {
-    const result = await pool.query(
+    await pool.query(
       `UPDATE trades SET
-        symbol=$1, entry_price=$2, exit_price=$3, profit_loss=$4,
-        entry_time=$5, session=$6, direction=$7, followed_plan=$8,
-        rating=$9, mistakes=$10, went_right=$11,
-        entry_window=$12, model=$13, positive_tags=$14,
-        negative_tags=$15, account=$16, be=$17
-      WHERE id=$18 RETURNING *`,
+        symbol=?, entry_price=?, exit_price=?, profit_loss=?,
+        entry_time=?, session=?, direction=?, followed_plan=?,
+        rating=?, mistakes=?, went_right=?,
+        entry_window=?, model=?, positive_tags=?,
+        negative_tags=?, account=?, be=?
+      WHERE id=?`,
       [
         symbol, entryPrice, exitPrice, profitLoss,
         entryTime, session, direction, followedPlan,
@@ -104,15 +109,16 @@ app.put('/api/trades/:id', async (req, res) => {
         account, be, req.params.id
       ]
     );
-    if (result.rowCount === 0) {
+    const [rows] = await pool.query('SELECT * FROM trades WHERE id = ?', [req.params.id]);
+    if (rows.length === 0) {
       return res.status(404).json({ error: 'Trade not found' });
     }
-    res.json(result.rows[0]);
+    res.json(rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
- 
+
 // Start the server
 const PORT = 5000;
 app.listen(PORT, () => {
