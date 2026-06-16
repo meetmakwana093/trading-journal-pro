@@ -26,7 +26,9 @@ pool.getConnection()
   .then(() => console.log('✅ Successfully connected to MySQL database!'))
   .catch(err => console.error('❌ Database connection error', err.stack));
 
-// CREATE TABLES IF NOT EXIST
+// ==========================================
+// AUTOMATIC DATABASE SETUP (RUNS ON STARTUP)
+// ==========================================
 pool.query(`
   CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -39,8 +41,26 @@ pool.query(`
 
 pool.query(`
   ALTER TABLE trades ADD COLUMN IF NOT EXISTS user_id INT
-`).then(() => console.log('✅ user_id column ready'))
-  .catch(() => console.log('ℹ️ user_id column already exists'));
+`).then(() => console.log('✅ user_id column ready in trades'))
+  .catch(() => console.log('ℹ️ user_id column already exists in trades'));
+
+// 🟢 NEW: Auto-Create Missed Trades Table with user_id attached
+pool.query(`
+  CREATE TABLE IF NOT EXISTS missed_trades (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    symbol VARCHAR(20) NOT NULL,
+    missed_entry_price DECIMAL(15,4) DEFAULT 0,
+    missed_exit_price DECIMAL(15,4) DEFAULT 0,
+    predicted_pnl DECIMAL(15,4) NOT NULL,
+    entry_time DATETIME NOT NULL,
+    reason VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  )
+`).then(() => console.log('✅ Missed Trades table ready'))
+  .catch(err => console.error('❌ Missed Trades table error:', err.message));
+
 
 // JWT MIDDLEWARE
 const verifyToken = (req, res, next) => {
@@ -75,6 +95,17 @@ const mapDBToReact = (row) => ({
   account: row.account || '',
   be: !!row.be,
   win: (parseFloat(row.profit_loss) || 0) > 0
+});
+
+// 🟢 NEW: Map Missed Trades DB Row to React Format
+const mapMissedDBToReact = (row) => ({
+  id: row.id,
+  symbol: row.symbol,
+  missedEntryPrice: parseFloat(row.missed_entry_price) || 0,
+  missedExitPrice: parseFloat(row.missed_exit_price) || 0,
+  predictedPnl: parseFloat(row.predicted_pnl) || 0,
+  date: row.entry_time, 
+  reason: row.reason || ''
 });
 
 // ==========================================
@@ -254,6 +285,73 @@ app.put('/api/trades/:id', verifyToken, async (req, res) => {
     const [rows] = await pool.query('SELECT * FROM trades WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return res.status(404).json({ error: 'Trade not found' });
     res.json(mapDBToReact(rows[0]));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// 🟢 NEW: MISSED TRADES ROUTES (PROTECTED)
+// ==========================================
+
+// GET ALL MISSED TRADES
+app.get('/api/missed-trades', verifyToken, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT * FROM missed_trades WHERE user_id = ? ORDER BY entry_time DESC',
+      [req.user.id]
+    );
+    res.json(rows.map(mapMissedDBToReact));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST NEW MISSED TRADE
+app.post('/api/missed-trades', verifyToken, async (req, res) => {
+  const { symbol, date, missedEntryPrice, missedExitPrice, predictedPnl, reason } = req.body;
+
+  let mysqlEntryTime;
+  try {
+    mysqlEntryTime = new Date(date).toISOString().slice(0, 19).replace('T', ' ');
+  } catch (e) {
+    mysqlEntryTime = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  }
+
+  try {
+    const [result] = await pool.query(
+      `INSERT INTO missed_trades 
+      (symbol, missed_entry_price, missed_exit_price, predicted_pnl, entry_time, reason, user_id) 
+      VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        symbol || 'UNKNOWN', 
+        missedEntryPrice || 0, 
+        missedExitPrice || 0, 
+        predictedPnl || 0, 
+        mysqlEntryTime, 
+        reason || 'Unknown',
+        req.user.id // Safely attaches it to the logged-in user
+      ]
+    );
+    
+    const [newRow] = await pool.query('SELECT * FROM missed_trades WHERE id = ?', [result.insertId]);
+    res.json(mapMissedDBToReact(newRow[0]));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE MISSED TRADE
+app.delete('/api/missed-trades/:id', verifyToken, async (req, res) => {
+  try {
+    const [result] = await pool.query(
+      'DELETE FROM missed_trades WHERE id = ? AND user_id = ?',
+      [req.params.id, req.user.id]
+    );
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Missed trade not found' });
+    }
+    res.json({ message: 'Missed trade deleted', id: req.params.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
