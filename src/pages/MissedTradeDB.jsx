@@ -380,3 +380,4 @@ const MissedTradesDB = ({ missedTrades = [], onAddMissedTrade, onDeleteMissedTra
 };
  
 export default MissedTradesDB;
+//fixed the changes
