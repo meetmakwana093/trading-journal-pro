@@ -6,21 +6,19 @@ import MilestonesPage from './pages/MilestonesPage';
 import Analytics from './pages/Analytics.jsx';
 import MissedTradeDB from './pages/MissedTradeDB.jsx';
 import TradesDB from './pages/TradeDB.jsx';
+import LoginPage from './pages/LoginPage';
+import { getUser, getToken, saveAuth, logout } from './auth/authService';
 import './App.css';
  
-// 🔴 THE CRITICAL FIX: This uses your Vercel Environment Variable. 
-// If it fails, it falls back to localhost for local testing.
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
  
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
+  const [trades, setTrades] = useState([]);
+  const [user, setUser] = useState(getUser());
  
-  // CALENDAR NAVIGATION STATE
   const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
- 
-  // 1. THIS IS THE BRAIN: Load trades from MySQL backend
-  const [trades, setTrades] = useState([]);
  
   const parseTags = (tags) => {
     if (Array.isArray(tags)) return tags;
@@ -52,49 +50,41 @@ export default function App() {
     };
   };
  
-  // 2. Fetch trades from backend on app load
   useEffect(() => {
-    fetch(`${API}/trades`)
+    if (!user) return;
+    fetch(`${API}/trades`, {
+      headers: { 'Authorization': `Bearer ${getToken()}` }
+    })
       .then(res => res.json())
       .then(data => {
-        // Prevent crashing if server returns an error object instead of an array
         if (Array.isArray(data)) {
           setTrades(data.map(formatTradeData));
         } else {
           console.error("Backend did not return an array:", data);
         }
       })
-      .catch(err => console.error('Failed to fetch trades. Check backend connection:', err));
-  }, []);
+      .catch(err => console.error('Failed to fetch trades:', err));
+  }, [user]);
  
-  // 3. Functions to modify the brain's data
-  // 3. Functions to modify the brain's data
   const handleAddTrade = (newTrade) => {
-    
-    // 🟢 THE FIX: We automatically attach a 0 for the prices so MySQL doesn't crash!
-    const safeTrade = {
-      entryPrice: 0,
-      exitPrice: 0,
-      ...newTrade
-    };
-
+    const safeTrade = { entryPrice: 0, exitPrice: 0, ...newTrade };
     fetch(`${API}/trades`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(safeTrade),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${getToken()}`
+      },
+      body: JSON.stringify(safeTrade)
     })
       .then(res => {
         if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
         return res.json();
       })
       .then(saved => {
-        // SAFETY BLOCK: Prevent "Ghost Rows" from appearing
-        if (!saved || Object.keys(saved).length === 0 || !saved.symbol) {
+        if (!saved || !saved.symbol) {
           alert("⚠️ Database Error: The server returned empty data.");
-          console.error("Invalid Backend Response:", saved);
           return;
         }
-        // If data is good, add it to the UI
         setTrades((prevTrades) => [formatTradeData(saved), ...prevTrades]);
       })
       .catch(err => {
@@ -104,7 +94,10 @@ export default function App() {
   };
  
   const handleDeleteTrade = (idToDelete) => {
-    fetch(`${API}/trades/${idToDelete}`, { method: 'DELETE' })
+    fetch(`${API}/trades/${idToDelete}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${getToken()}` }
+    })
       .then(() => {
         setTrades((prevTrades) => prevTrades.filter(trade => trade.id !== idToDelete));
       })
@@ -114,35 +107,39 @@ export default function App() {
   const handleUpdateTrade = (updatedTrade) => {
     fetch(`${API}/trades/${updatedTrade.id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedTrade),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${getToken()}`
+      },
+      body: JSON.stringify(updatedTrade)
     })
       .then(res => res.json())
       .then(saved => {
-        if (!saved || !saved.symbol) return; // Prevent corrupting data on update
+        if (!saved || !saved.symbol) return;
         const mapped = formatTradeData(saved);
         setTrades((prevTrades) => prevTrades.map(trade => trade.id === mapped.id ? mapped : trade));
       })
       .catch(err => console.error('Failed to update trade:', err));
   };
  
-  // CALENDAR NAVIGATION HANDLERS
+  const handleLogin = (userData) => {
+    setUser(userData);
+  };
+ 
+  const handleLogout = () => {
+    logout();
+    setUser(null);
+    setTrades([]);
+  };
+ 
   const handlePrevMonth = () => {
-    if (calendarMonth === 0) {
-      setCalendarMonth(11);
-      setCalendarYear(y => y - 1);
-    } else {
-      setCalendarMonth(m => m - 1);
-    }
+    if (calendarMonth === 0) { setCalendarMonth(11); setCalendarYear(y => y - 1); }
+    else setCalendarMonth(m => m - 1);
   };
  
   const handleNextMonth = () => {
-    if (calendarMonth === 11) {
-      setCalendarMonth(0);
-      setCalendarYear(y => y + 1);
-    } else {
-      setCalendarMonth(m => m + 1);
-    }
+    if (calendarMonth === 11) { setCalendarMonth(0); setCalendarYear(y => y + 1); }
+    else setCalendarMonth(m => m + 1);
   };
  
   const tabs = [
@@ -159,7 +156,6 @@ export default function App() {
     if (total === 0) {
       return { winRate: 0, totalPnL: 0, returns: 0, profitFactor: 0, maxDrawdown: 0, avgWin: 0, avgLoss: 0 };
     }
- 
     const winningTrades = trades.filter(t => t.profitLoss > 0);
     const losingTrades = trades.filter(t => t.profitLoss < 0);
     const winning = winningTrades.length;
@@ -171,9 +167,7 @@ export default function App() {
     const grossLoss = Math.abs(losingTrades.reduce((sum, t) => sum + t.profitLoss, 0));
     const profitFactor = grossLoss === 0 ? 0 : grossProfit / grossLoss;
     const sortedTrades = [...trades].sort((a, b) => new Date(a.entryTime) - new Date(b.entryTime));
-    let cumulative = 0;
-    let peak = 0;
-    let maxDrawdown = 0;
+    let cumulative = 0, peak = 0, maxDrawdown = 0;
     sortedTrades.forEach(t => {
       cumulative += t.profitLoss;
       if (cumulative > peak) peak = cumulative;
@@ -194,7 +188,7 @@ export default function App() {
   };
  
   const calculateSymbolPerformance = (trades) => {
-    const symbols = [...new Set(trades.map(t => t.symbol))]; 
+    const symbols = [...new Set(trades.map(t => t.symbol))];
     const performance = {};
     symbols.forEach(symbol => {
       const symbolTrades = trades.filter(t => t.symbol === symbol);
@@ -207,25 +201,17 @@ export default function App() {
   const calculateAccountGrowth = (trades) => {
     const sortedTrades = [...trades].sort((a, b) => new Date(a.entryTime) - new Date(b.entryTime));
     let cumulative = 0;
-    const growth = [];
-    sortedTrades.forEach((t, index) => {
+    return sortedTrades.map((t, index) => {
       cumulative += t.profitLoss;
-      growth.push({
-        trade: index + 1,
-        cumulative: parseFloat(cumulative.toFixed(2)),
-        date: t.entryTime
-      });
+      return { trade: index + 1, cumulative: parseFloat(cumulative.toFixed(2)), date: t.entryTime };
     });
-    return growth;
   };
  
   const calculateRecoveryFactor = (trades) => {
     if (trades.length === 0) return 0;
     const totalPnL = trades.reduce((sum, t) => sum + t.profitLoss, 0);
     const sortedTrades = [...trades].sort((a, b) => new Date(a.entryTime) - new Date(b.entryTime));
-    let cumulative = 0;
-    let peak = 0;
-    let maxDrawdown = 0;
+    let cumulative = 0, peak = 0, maxDrawdown = 0;
     sortedTrades.forEach(t => {
       cumulative += t.profitLoss;
       if (cumulative > peak) peak = cumulative;
@@ -246,17 +232,15 @@ export default function App() {
  
   const formatCurrency = (number) => {
     return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      style: 'currency', currency: 'USD',
+      minimumFractionDigits: 0, maximumFractionDigits: 0,
     }).format(number);
   };
  
   const getCalendarData = (trades) => {
     const grouped = {};
     trades.forEach(t => {
-      if(!t.entryTime) return;
+      if (!t.entryTime) return;
       const date = t.entryTime.split('T')[0];
       if (!grouped[date]) grouped[date] = 0;
       grouped[date] += t.profitLoss;
@@ -274,10 +258,10 @@ export default function App() {
   const calculateDOWPerformance = (trades) => {
     const dow = { 'Mon': 0, 'Tue': 0, 'Wed': 0, 'Thu': 0, 'Fri': 0 };
     trades.forEach(t => {
-      if(t.entryTime) {
+      if (t.entryTime) {
         const d = new Date(t.entryTime);
-        const day = d.toLocaleDateString('en-US', {weekday: 'short'});
-        if(dow[day] !== undefined) dow[day] += t.profitLoss;
+        const day = d.toLocaleDateString('en-US', { weekday: 'short' });
+        if (dow[day] !== undefined) dow[day] += t.profitLoss;
       }
     });
     return Object.keys(dow).map(day => ({ day, pnl: parseFloat(dow[day].toFixed(2)) }));
@@ -288,7 +272,6 @@ export default function App() {
   const symbolData = Object.entries(calculateSymbolPerformance(trades)).map(([symbol, pnl]) => ({ symbol, pnl }));
   const dowData = calculateDOWPerformance(trades);
  
-  // CALENDAR VARS - NOW DYNAMIC BASED ON STATE
   const currentMonth = calendarMonth;
   const currentYear = calendarYear;
   const currentMonthName = new Date(calendarYear, calendarMonth).toLocaleString('default', { month: 'long' });
@@ -303,12 +286,34 @@ export default function App() {
     { subject: 'Recovery Factor', A: Math.min((calculateRecoveryFactor(trades) / 3) * 100, 100), fullMark: 100 },
   ];
  
+  if (!user) return <LoginPage onLogin={handleLogin} />;
+ 
   return (
     <div className="App">
       <header className="header">
         <div className="logo" onClick={() => setActiveTab('home')} style={{ cursor: 'pointer' }}>
           <div className="logo-icon"></div>
           <h1>Trading Journal Pro</h1>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <span style={{ color: '#00FF88', fontWeight: 'bold', fontSize: '0.9rem' }}>
+            {user?.email || 'User'}
+          </span>
+          <button
+            onClick={handleLogout}
+            style={{
+              background: 'transparent',
+              border: '1px solid #EB5757',
+              color: '#EB5757',
+              padding: '6px 12px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '0.9rem',
+              transition: 'all 0.2s'
+            }}
+          >
+            Logout
+          </button>
         </div>
       </header>
  
@@ -320,12 +325,9 @@ export default function App() {
         ))}
       </div>
  
-      {/* MAIN CONTENT AREA */}
       <div className="main-content">
-        
         {activeTab === 'home' ? (
           <>
-            {/* Left Column (25%) */}
             <div className="left-column">
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 <motion.div whileHover={{ boxShadow: '0 0 20px rgba(0, 255, 136, 0.4)' }} style={{ background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '12px', padding: '20px' }}>
@@ -340,7 +342,6 @@ export default function App() {
                     </RadarChart>
                   </ResponsiveContainer>
                 </motion.div>
- 
                 <motion.div whileHover={{ boxShadow: '0 0 20px rgba(0, 255, 136, 0.4)' }} style={{ background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '12px', padding: '20px' }}>
                   <h3 style={{ color: '#00FF88', margin: '0 0 15px 0', fontSize: '1.1rem', textAlign: 'center' }}>📅 Daily Performance</h3>
                   <ResponsiveContainer width="100%" height={250}>
@@ -359,8 +360,7 @@ export default function App() {
                 </motion.div>
               </motion.div>
             </div>
-    
-            {/* Center Column (50%) */}
+ 
             <div className="center-column">
               <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} style={{ textAlign: 'center', marginBottom: '30px', background: 'rgba(0, 255, 136, 0.05)', padding: '30px', borderRadius: '12px', border: '1px solid rgba(0, 255, 136, 0.2)' }}>
                 <h1 style={{ fontSize: '2.5rem', color: '#00FF88', margin: '0 0 10px 0', fontWeight: 'bold' }}>Trading Dashboard</h1>
@@ -372,7 +372,7 @@ export default function App() {
                   <span style={{ color: '#00FF88', fontWeight: 'bold' }}>Profit Factor: {metrics.profitFactor}</span>
                 </p>
               </motion.div>
-    
+ 
               <motion.div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginBottom: '30px' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ staggerChildren: 0.1 }}>
                 <motion.div whileHover={{ scale: 1.08, boxShadow: '0 0 25px rgba(0, 255, 136, 0.6)' }} style={{ background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '12px', padding: '20px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.3s' }}>
                   <div style={{ color: '#B0B0B0', fontSize: '0.9rem', marginBottom: '10px' }}>Win Rate</div>
@@ -391,7 +391,7 @@ export default function App() {
                   <div style={{ color: '#00FF88', fontSize: '2.5rem', fontWeight: 'bold' }}>{metrics.profitFactor}</div>
                 </motion.div>
               </motion.div>
-    
+ 
               <motion.div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '30px' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                 <motion.div whileHover={{ boxShadow: '0 0 20px rgba(0, 255, 136, 0.4)' }} style={{ background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '12px', padding: '20px' }}>
                   <h3 style={{ color: '#00FF88', margin: '0 0 15px 0', fontSize: '1.1rem' }}>📈 Account Growth</h3>
@@ -411,7 +411,6 @@ export default function App() {
                     </LineChart>
                   </ResponsiveContainer>
                 </motion.div>
-    
                 <motion.div whileHover={{ boxShadow: '0 0 20px rgba(0, 255, 136, 0.4)' }} style={{ background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '12px', padding: '20px' }}>
                   <h3 style={{ color: '#00FF88', margin: '0 0 15px 0', fontSize: '1.1rem' }}>📊 Symbol Performance</h3>
                   <ResponsiveContainer width="100%" height={250}>
@@ -429,31 +428,23 @@ export default function App() {
                   </ResponsiveContainer>
                 </motion.div>
               </motion.div>
-    
-              {/* CALENDAR - NOW WITH NAVIGATION */}
+ 
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '12px', padding: '20px' }}>
-                
-                {/* CALENDAR HEADER WITH PREV/NEXT BUTTONS */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
                   <button
                     onClick={handlePrevMonth}
-                    style={{ background: 'rgba(0,255,136,0.1)', border: '1px solid rgba(0,255,136,0.3)', color: '#00FF88', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold', transition: 'all 0.2s' }}
+                    style={{ background: 'rgba(0,255,136,0.1)', border: '1px solid rgba(0,255,136,0.3)', color: '#00FF88', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold' }}
                     onMouseEnter={e => e.target.style.background = 'rgba(0,255,136,0.25)'}
                     onMouseLeave={e => e.target.style.background = 'rgba(0,255,136,0.1)'}
                   >←</button>
- 
-                  <h3 style={{ color: '#00FF88', margin: 0, fontSize: '1.1rem' }}>
-                    📅 {currentMonthName} {currentYear}
-                  </h3>
- 
+                  <h3 style={{ color: '#00FF88', margin: 0, fontSize: '1.1rem' }}>📅 {currentMonthName} {currentYear}</h3>
                   <button
                     onClick={handleNextMonth}
-                    style={{ background: 'rgba(0,255,136,0.1)', border: '1px solid rgba(0,255,136,0.3)', color: '#00FF88', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold', transition: 'all 0.2s' }}
+                    style={{ background: 'rgba(0,255,136,0.1)', border: '1px solid rgba(0,255,136,0.3)', color: '#00FF88', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold' }}
                     onMouseEnter={e => e.target.style.background = 'rgba(0,255,136,0.25)'}
                     onMouseLeave={e => e.target.style.background = 'rgba(0,255,136,0.1)'}
                   >→</button>
                 </div>
- 
                 <div className="calendar-header">
                   {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
                     <div key={index}>{day}</div>
@@ -467,11 +458,9 @@ export default function App() {
                     const monthStr = (currentMonth + 1).toString().padStart(2, '0');
                     const dayStr = day.toString().padStart(2, '0');
                     const dateStr = `${currentYear}-${monthStr}-${dayStr}`;
-                    
                     const data = calendarData[dateStr];
                     const isWeekend = new Date(currentYear, currentMonth, day).getDay() === 0 || new Date(currentYear, currentMonth, day).getDay() === 6;
                     const dayClass = data ? (data.pnl > 0 ? 'positive' : data.pnl < 0 ? 'negative' : 'neutral') : isWeekend ? 'weekend' : '';
-                    
                     return (
                       <motion.div key={dateStr} whileHover={{ scale: 1.1, boxShadow: '0 0 15px rgba(0, 255, 136, 0.5)' }} className={`calendar-day ${dayClass}`} style={{ transition: 'all 0.3s' }}>
                         <div className="calendar-day-number">{day}</div>
@@ -482,8 +471,7 @@ export default function App() {
                 </div>
               </motion.div>
             </div>
-    
-            {/* Right Column (25%) */}
+ 
             <div className="right-column">
               <div className="section-title">Win Rate</div>
               <div className="info-card">
@@ -491,24 +479,19 @@ export default function App() {
                   {metrics.winRate}%
                 </div>
               </div>
-    
               <div className="section-title">Info Cards</div>
               <div className="info-cards">
                 <div className="info-card">
                   <div className="info-card-title">Avg Win</div>
-                  <div className={`info-card-value positive`}>
-                    {formatCurrency(metrics.avgWin)}
-                  </div>
+                  <div className="info-card-value positive">{formatCurrency(metrics.avgWin)}</div>
                 </div>
                 <div className="info-card">
                   <div className="info-card-title">Avg Loss</div>
-                  <div className={`info-card-value negative`} style={{color: '#FF3333'}}>
-                    {formatCurrency(metrics.avgLoss)}
-                  </div>
+                  <div className="info-card-value negative" style={{ color: '#FF3333' }}>{formatCurrency(metrics.avgLoss)}</div>
                 </div>
                 <div className="info-card">
                   <div className="info-card-title">Max Drawdown</div>
-                  <div className="info-card-value" style={{color: '#FF3333'}}>{metrics.maxDrawdown}%</div>
+                  <div className="info-card-value" style={{ color: '#FF3333' }}>{metrics.maxDrawdown}%</div>
                 </div>
               </div>
             </div>
