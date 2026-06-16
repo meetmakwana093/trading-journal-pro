@@ -5,7 +5,13 @@
       "Bash(git branch *)",
       "Bash(git push *)",
       "Bash(gh --version)",
-      "Bash(git fetch *)"
+      "Bash(git fetch *)",
+      "Bash(node server.js)",
+      "Bash(curl -s http://localhost:5000/api/trades)",
+      "Bash(curl -s -X POST http://localhost:5000/api/trades -H \"Content-Type: application/json\" -d '{\"symbol\":\"AAPL\",\"entryPrice\":150,\"exitPrice\":155,\"profitLoss\":5,\"entryTime\":\"2026-06-16 10:30:00\",\"session\":\"Morning\",\"direction\":\"Long\",\"followedPlan\":true,\"rating\":5,\"mistakes\":\"none\",\"wentRight\":\"good timing\",\"entryWindow\":\"9:30-10:00\",\"model\":\"Swing Trade\",\"positiveTags\":\"bullish\",\"negativeTags\":\"\",\"account\":\"10000\",\"be\":0}')",
+      "Bash(curl -s -X PUT http://localhost:5000/api/trades/2 -H \"Content-Type: application/json\" -d '{\"symbol\":\"AAPL\",\"entryPrice\":150,\"exitPrice\":155,\"profitLoss\":5,\"entryTime\":\"2026-06-16 10:30:00\",\"session\":\"Morning\",\"direction\":\"Long\",\"followedPlan\":true,\"rating\":3,\"mistakes\":\"none\",\"wentRight\":\"good timing\",\"entryWindow\":\"9:30-10:00\",\"model\":\"Swing Trade\",\"positiveTags\":\"bullish\",\"negativeTags\":\"\",\"account\":\"10000\",\"be\":0}')",
+      "Bash(curl -s -X DELETE http://localhost:5000/api/trades/2)",
+      "Bash(pkill -f \"node server.js\")"
     ]
   }
 }

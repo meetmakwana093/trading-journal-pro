@@ -11,6 +11,8 @@ const TradesDB = ({ trades, onAddTrade, onDeleteTrade }) => {
     date: new Date().toISOString().split('T')[0],
     session: 'New York',
     direction: 'LONG',
+    entryPrice: '',  // 🟢 NEW
+    exitPrice: '',   // 🟢 NEW
     profitLoss: 0,
     followedPlan: true,
     be: false,
@@ -39,8 +41,9 @@ const TradesDB = ({ trades, onAddTrade, onDeleteTrade }) => {
     const newTrade = {
       id: Date.now(), 
       symbol: formData.symbol.toUpperCase(),
+      entryPrice: parseFloat(formData.entryPrice) || 0, // 🟢 NEW: Safely handles blanks
+      exitPrice: parseFloat(formData.exitPrice) || 0,   // 🟢 NEW: Safely handles blanks
       profitLoss: parseFloat(formData.profitLoss),
-      // entryTime is VITAL for the other analytics tabs to do their calculations!
       entryTime: dateObj.toISOString(), 
       
       // Additional Notion-style display data
@@ -62,9 +65,10 @@ const TradesDB = ({ trades, onAddTrade, onDeleteTrade }) => {
       year: dateObj.getFullYear()
     };
 
-    onAddTrade(newTrade); // Send the trade up to App.jsx memory
+    onAddTrade(newTrade); 
     setShowForm(false); 
-    setFormData(prev => ({ ...prev, profitLoss: 0, positiveTags: '', negativeTags: '' }));
+    // 🟢 NEW: Reset the price fields along with the others
+    setFormData(prev => ({ ...prev, profitLoss: 0, entryPrice: '', exitPrice: '', positiveTags: '', negativeTags: '' }));
   };
 
   // Calculate Footer Summary Metrics
@@ -97,7 +101,7 @@ const TradesDB = ({ trades, onAddTrade, onDeleteTrade }) => {
     checkboxGroup: { display: 'flex', alignItems: 'center', gap: '8px', height: '100%', paddingTop: '15px' },
     submitButton: { backgroundColor: '#219653', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', marginTop: '20px', width: '100%' },
     tableWrapper: { overflowX: 'auto', paddingBottom: '20px' },
-    table: { width: '100%', minWidth: '1600px', borderCollapse: 'collapse', fontSize: '14px' },
+    table: { width: '100%', minWidth: '1700px', borderCollapse: 'collapse', fontSize: '14px' }, // Widened table slightly for new columns
     th: { textAlign: 'left', padding: '12px 16px', color: '#9B9A97', fontWeight: '500', borderBottom: '1px solid rgba(255,255,255,0.1)', whiteSpace: 'nowrap' },
     td: { padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', whiteSpace: 'nowrap' },
     deleteBtn: { backgroundColor: 'transparent', color: '#EB5757', border: '1px solid rgba(235, 87, 87, 0.4)', borderRadius: '4px', cursor: 'pointer', padding: '4px 8px', fontSize: '12px', transition: 'all 0.2s' },
@@ -167,6 +171,17 @@ const TradesDB = ({ trades, onAddTrade, onDeleteTrade }) => {
                   <option>SHORT</option>
                 </select>
               </div>
+              
+              {/* 🟢 NEW INPUT BOXES */}
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>Entry Price</label>
+                <input style={styles.input} type="number" step="any" name="entryPrice" placeholder="e.g. 45000.5" value={formData.entryPrice} onChange={handleChange} />
+              </div>
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>Exit Price</label>
+                <input style={styles.input} type="number" step="any" name="exitPrice" placeholder="e.g. 45100.0" value={formData.exitPrice} onChange={handleChange} />
+              </div>
+
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Profit / Loss ($)</label>
                 <input style={styles.input} type="number" name="profitLoss" value={formData.profitLoss} onChange={handleChange} required />
@@ -214,6 +229,9 @@ const TradesDB = ({ trades, onAddTrade, onDeleteTrade }) => {
               <th style={styles.th}>📈 Pairs</th>
               <th style={styles.th}>⏳ Session</th>
               <th style={styles.th}>↕️ Direction</th>
+              {/* 🟢 NEW TABLE HEADERS */}
+              <th style={styles.th}>🎯 Entry Price</th>
+              <th style={styles.th}>🏁 Exit Price</th>
               <th style={styles.th}>💵 Profit/Loss</th>
               <th style={styles.th}>☑️ Followed Plan</th>
               <th style={styles.th}>☑️ BE</th>
@@ -230,7 +248,7 @@ const TradesDB = ({ trades, onAddTrade, onDeleteTrade }) => {
           <tbody>
             {!trades || trades.length === 0 ? (
               <tr>
-                <td colSpan={16} style={styles.emptyState}>
+                <td colSpan={18} style={styles.emptyState}>
                   No trades logged yet. Click "Add Manual Trade" to start journaling!
                 </td>
               </tr>
@@ -242,6 +260,11 @@ const TradesDB = ({ trades, onAddTrade, onDeleteTrade }) => {
                   <td style={styles.td}><strong>{trade.symbol}</strong></td>
                   <td style={styles.td}><span style={styles.pill(trade.session || 'New York')}>{trade.session || 'N/A'}</span></td>
                   <td style={styles.td}><span style={styles.pill(trade.direction || (trade.profitLoss > 0 ? 'LONG' : 'SHORT'))}>{trade.direction || '-'}</span></td>
+                  
+                  {/* 🟢 NEW TABLE DATA CELLS */}
+                  <td style={styles.td}>{trade.entryPrice === 0 ? '-' : trade.entryPrice}</td>
+                  <td style={styles.td}>{trade.exitPrice === 0 ? '-' : trade.exitPrice}</td>
+
                   <td style={{...styles.td, color: trade.profitLoss > 0 ? '#219653' : '#EB5757', fontWeight: 'bold'}}>
                     ${trade.profitLoss}
                   </td>
@@ -267,7 +290,8 @@ const TradesDB = ({ trades, onAddTrade, onDeleteTrade }) => {
             
             {trades && trades.length > 0 && (
               <tr style={styles.footerRow}>
-                <td style={{ ...styles.td, textAlign: 'right', paddingRight: '16px' }} colSpan={5}>SUM / AVG</td>
+                {/* 🟢 Shifted colSpan to account for the 2 new columns */}
+                <td style={{ ...styles.td, textAlign: 'right', paddingRight: '16px' }} colSpan={7}>SUM / AVG</td>
                 <td style={{...styles.td, color: '#FFFFFF'}}>${summary.totalPnL}</td>
                 <td style={{...styles.td, color: '#FFFFFF'}}>{summary.planPercent}%</td>
                 <td style={styles.td}></td>
