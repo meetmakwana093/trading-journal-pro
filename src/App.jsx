@@ -9,23 +9,27 @@ import TradesDB from './pages/TradeDB.jsx';
 import LoginPage from './pages/LoginPage';
 import { getUser, getToken, saveAuth, logout } from './auth/authService';
 import './App.css';
- 
+
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
- 
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [trades, setTrades] = useState([]);
+  
+  // 🟢 NEW: Dedicated memory for Missed Trades
+  const [missedTrades, setMissedTrades] = useState([]);
+  
   const [user, setUser] = useState(getUser());
- 
+
   const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
- 
+
   const parseTags = (tags) => {
     if (Array.isArray(tags)) return tags;
     if (typeof tags === 'string' && tags.trim() !== '') return tags.split(',').map(t => t.trim());
     return [];
   };
- 
+
   const formatTradeData = (data) => {
     return {
       id: data.id,
@@ -49,23 +53,47 @@ export default function App() {
       win: (parseFloat(data.profitLoss !== undefined ? data.profitLoss : data.profit_loss) || 0) > 0
     };
   };
- 
+
+  // 🟢 NEW: Formatter for Missed Trades
+  const formatMissedTradeData = (data) => {
+    return {
+      id: data.id,
+      symbol: data.symbol,
+      missedEntryPrice: parseFloat(data.missedEntryPrice !== undefined ? data.missedEntryPrice : data.missed_entry_price) || 0,
+      missedExitPrice: parseFloat(data.missedExitPrice !== undefined ? data.missedExitPrice : data.missed_exit_price) || 0,
+      predictedPnl: parseFloat(data.predictedPnl !== undefined ? data.predictedPnl : data.predicted_pnl) || 0,
+      date: data.date || data.entry_time,
+      reason: data.reason || ''
+    };
+  };
+
+  // 🟢 UPDATED: Auto-fetch BOTH tables securely on login
   useEffect(() => {
     if (!user) return;
+    
+    // Fetch Normal Trades
     fetch(`${API}/trades`, {
       headers: { 'Authorization': `Bearer ${getToken()}` }
     })
       .then(res => res.json())
       .then(data => {
-        if (Array.isArray(data)) {
-          setTrades(data.map(formatTradeData));
-        } else {
-          console.error("Backend did not return an array:", data);
-        }
+        if (Array.isArray(data)) setTrades(data.map(formatTradeData));
       })
       .catch(err => console.error('Failed to fetch trades:', err));
+
+    // Fetch Missed Trades
+    fetch(`${API}/missed-trades`, {
+      headers: { 'Authorization': `Bearer ${getToken()}` }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setMissedTrades(data.map(formatMissedTradeData));
+      })
+      .catch(err => console.error('Failed to fetch missed trades:', err));
+
   }, [user]);
- 
+
+  // --- Normal Trade Functions ---
   const handleAddTrade = (newTrade) => {
     const safeTrade = { entryPrice: 0, exitPrice: 0, ...newTrade };
     fetch(`${API}/trades`, {
@@ -81,29 +109,21 @@ export default function App() {
         return res.json();
       })
       .then(saved => {
-        if (!saved || !saved.symbol) {
-          alert("⚠️ Database Error: The server returned empty data.");
-          return;
-        }
+        if (!saved || !saved.symbol) return;
         setTrades((prevTrades) => [formatTradeData(saved), ...prevTrades]);
       })
-      .catch(err => {
-        console.error('Failed to add trade:', err);
-        alert("⚠️ Connection Error: Could not reach the database backend.");
-      });
+      .catch(err => alert("⚠️ Connection Error: Could not reach the database backend."));
   };
- 
+
   const handleDeleteTrade = (idToDelete) => {
     fetch(`${API}/trades/${idToDelete}`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${getToken()}` }
     })
-      .then(() => {
-        setTrades((prevTrades) => prevTrades.filter(trade => trade.id !== idToDelete));
-      })
+      .then(() => setTrades((prev) => prev.filter(trade => trade.id !== idToDelete)))
       .catch(err => console.error('Failed to delete trade:', err));
   };
- 
+
   const handleUpdateTrade = (updatedTrade) => {
     fetch(`${API}/trades/${updatedTrade.id}`, {
       method: 'PUT',
@@ -117,31 +137,62 @@ export default function App() {
       .then(saved => {
         if (!saved || !saved.symbol) return;
         const mapped = formatTradeData(saved);
-        setTrades((prevTrades) => prevTrades.map(trade => trade.id === mapped.id ? mapped : trade));
+        setTrades((prev) => prev.map(trade => trade.id === mapped.id ? mapped : trade));
       })
       .catch(err => console.error('Failed to update trade:', err));
   };
- 
+
+  // 🟢 NEW: Missed Trade Functions
+  const handleAddMissedTrade = (newMissedTrade) => {
+    fetch(`${API}/missed-trades`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${getToken()}` // Sends the VIP pass!
+      },
+      body: JSON.stringify(newMissedTrade)
+    })
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+        return res.json();
+      })
+      .then(saved => {
+        if (!saved || !saved.symbol) return;
+        setMissedTrades((prev) => [formatMissedTradeData(saved), ...prev]);
+      })
+      .catch(err => alert("⚠️ Connection Error: Could not save missed trade."));
+  };
+
+  const handleDeleteMissedTrade = (idToDelete) => {
+    fetch(`${API}/missed-trades/${idToDelete}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${getToken()}` }
+    })
+      .then(() => setMissedTrades((prev) => prev.filter(trade => trade.id !== idToDelete)))
+      .catch(err => console.error('Failed to delete missed trade:', err));
+  };
+
   const handleLogin = (userData) => {
     setUser(userData);
   };
- 
+
   const handleLogout = () => {
     logout();
     setUser(null);
     setTrades([]);
+    setMissedTrades([]); // Clear missed trades on logout
   };
- 
+
   const handlePrevMonth = () => {
     if (calendarMonth === 0) { setCalendarMonth(11); setCalendarYear(y => y - 1); }
     else setCalendarMonth(m => m - 1);
   };
- 
+
   const handleNextMonth = () => {
     if (calendarMonth === 11) { setCalendarMonth(0); setCalendarYear(y => y + 1); }
     else setCalendarMonth(m => m + 1);
   };
- 
+
   const tabs = [
     { label: 'HOME', value: 'home' },
     { label: 'ANALYTICS', value: 'analytics' },
@@ -150,7 +201,7 @@ export default function App() {
     { label: 'MISSED TRADES DB', value: 'missedTradesDb' },
     { label: 'MILESTONES', value: 'milestones' },
   ];
- 
+
   const calculateMetrics = (trades) => {
     const total = trades.length;
     if (total === 0) {
@@ -186,7 +237,7 @@ export default function App() {
       avgLoss: parseFloat(avgLoss.toFixed(2)),
     };
   };
- 
+
   const calculateSymbolPerformance = (trades) => {
     const symbols = [...new Set(trades.map(t => t.symbol))];
     const performance = {};
@@ -197,7 +248,7 @@ export default function App() {
     });
     return performance;
   };
- 
+
   const calculateAccountGrowth = (trades) => {
     const sortedTrades = [...trades].sort((a, b) => new Date(a.entryTime) - new Date(b.entryTime));
     let cumulative = 0;
@@ -206,7 +257,7 @@ export default function App() {
       return { trade: index + 1, cumulative: parseFloat(cumulative.toFixed(2)), date: t.entryTime };
     });
   };
- 
+
   const calculateRecoveryFactor = (trades) => {
     if (trades.length === 0) return 0;
     const totalPnL = trades.reduce((sum, t) => sum + t.profitLoss, 0);
@@ -220,7 +271,7 @@ export default function App() {
     });
     return maxDrawdown === 0 ? 0 : totalPnL / (maxDrawdown / 100 * Math.abs(peak));
   };
- 
+
   const calculateConsistencyScore = (trades) => {
     if (trades.length === 0) return 0;
     const winningTrades = trades.filter(t => t.profitLoss > 0);
@@ -229,14 +280,14 @@ export default function App() {
     const profitFactorScore = Math.min(metrics.profitFactor, 3) / 3;
     return parseFloat((winRate * 0.6 + profitFactorScore * 0.4) * 100).toFixed(2);
   };
- 
+
   const formatCurrency = (number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency', currency: 'USD',
       minimumFractionDigits: 0, maximumFractionDigits: 0,
     }).format(number);
   };
- 
+
   const getCalendarData = (trades) => {
     const grouped = {};
     trades.forEach(t => {
@@ -254,7 +305,7 @@ export default function App() {
     }
     return calendarData;
   };
- 
+
   const calculateDOWPerformance = (trades) => {
     const dow = { 'Mon': 0, 'Tue': 0, 'Wed': 0, 'Thu': 0, 'Fri': 0 };
     trades.forEach(t => {
@@ -266,18 +317,18 @@ export default function App() {
     });
     return Object.keys(dow).map(day => ({ day, pnl: parseFloat(dow[day].toFixed(2)) }));
   };
- 
+
   const metrics = calculateMetrics(trades);
   const calendarData = getCalendarData(trades);
   const symbolData = Object.entries(calculateSymbolPerformance(trades)).map(([symbol, pnl]) => ({ symbol, pnl }));
   const dowData = calculateDOWPerformance(trades);
- 
+
   const currentMonth = calendarMonth;
   const currentYear = calendarYear;
   const currentMonthName = new Date(calendarYear, calendarMonth).toLocaleString('default', { month: 'long' });
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
- 
+
   const profileData = [
     { subject: 'Win Rate', A: metrics.winRate, fullMark: 100 },
     { subject: 'Plan Adherence', A: trades.length ? (trades.filter(t => t.followedPlan !== false).length / trades.length) * 100 : 0, fullMark: 100 },
@@ -285,9 +336,9 @@ export default function App() {
     { subject: 'Profit Factor', A: Math.min((metrics.profitFactor / 3) * 100, 100), fullMark: 100 },
     { subject: 'Recovery Factor', A: Math.min((calculateRecoveryFactor(trades) / 3) * 100, 100), fullMark: 100 },
   ];
- 
+
   if (!user) return <LoginPage onLogin={handleLogin} />;
- 
+
   return (
     <div className="App">
       <header className="header">
@@ -316,7 +367,7 @@ export default function App() {
           </button>
         </div>
       </header>
- 
+
       <div className="tabs-container">
         {tabs.map(tab => (
           <button key={tab.value} className={`tab-btn ${activeTab === tab.value ? 'active' : ''}`} onClick={() => setActiveTab(tab.value)}>
@@ -324,7 +375,7 @@ export default function App() {
           </button>
         ))}
       </div>
- 
+
       <div className="main-content">
         {activeTab === 'home' ? (
           <>
@@ -360,7 +411,7 @@ export default function App() {
                 </motion.div>
               </motion.div>
             </div>
- 
+
             <div className="center-column">
               <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} style={{ textAlign: 'center', marginBottom: '30px', background: 'rgba(0, 255, 136, 0.05)', padding: '30px', borderRadius: '12px', border: '1px solid rgba(0, 255, 136, 0.2)' }}>
                 <h1 style={{ fontSize: '2.5rem', color: '#00FF88', margin: '0 0 10px 0', fontWeight: 'bold' }}>Trading Dashboard</h1>
@@ -372,7 +423,7 @@ export default function App() {
                   <span style={{ color: '#00FF88', fontWeight: 'bold' }}>Profit Factor: {metrics.profitFactor}</span>
                 </p>
               </motion.div>
- 
+
               <motion.div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginBottom: '30px' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ staggerChildren: 0.1 }}>
                 <motion.div whileHover={{ scale: 1.08, boxShadow: '0 0 25px rgba(0, 255, 136, 0.6)' }} style={{ background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '12px', padding: '20px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.3s' }}>
                   <div style={{ color: '#B0B0B0', fontSize: '0.9rem', marginBottom: '10px' }}>Win Rate</div>
@@ -391,7 +442,7 @@ export default function App() {
                   <div style={{ color: '#00FF88', fontSize: '2.5rem', fontWeight: 'bold' }}>{metrics.profitFactor}</div>
                 </motion.div>
               </motion.div>
- 
+
               <motion.div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '30px' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                 <motion.div whileHover={{ boxShadow: '0 0 20px rgba(0, 255, 136, 0.4)' }} style={{ background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '12px', padding: '20px' }}>
                   <h3 style={{ color: '#00FF88', margin: '0 0 15px 0', fontSize: '1.1rem' }}>📈 Account Growth</h3>
@@ -428,7 +479,7 @@ export default function App() {
                   </ResponsiveContainer>
                 </motion.div>
               </motion.div>
- 
+
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '12px', padding: '20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
                   <button
@@ -471,7 +522,7 @@ export default function App() {
                 </div>
               </motion.div>
             </div>
- 
+
             <div className="right-column">
               <div className="section-title">Win Rate</div>
               <div className="info-card">
@@ -505,7 +556,12 @@ export default function App() {
             ) : activeTab === 'milestones' ? (
               <MilestonesPage trades={trades} />
             ) : activeTab === 'missedTradesDb' ? (
-              <MissedTradeDB trades={trades} />
+              <MissedTradeDB 
+                missedTrades={missedTrades} 
+                onAddMissedTrade={handleAddMissedTrade} 
+                onDeleteMissedTrade={handleDeleteMissedTrade} 
+              />
+            
             ) : activeTab === 'tradesDb' ? (
               <TradesDB trades={trades} onAddTrade={handleAddTrade} onDeleteTrade={handleDeleteTrade} />
             ) : (
