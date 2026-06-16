@@ -44,7 +44,7 @@ const TradesDB = ({ trades, onAddTrade, onDeleteTrade }) => {
       entryPrice: parseFloat(formData.entryPrice) || 0, // 🟢 NEW: Safely handles blanks
       exitPrice: parseFloat(formData.exitPrice) || 0,   // 🟢 NEW: Safely handles blanks
       profitLoss: parseFloat(formData.profitLoss),
-      entryTime: dateObj.toISOString(), 
+      entryTime: dateObj.toISOString().slice(0, 19).replace('T', ' '),
       
       // Additional Notion-style display data
       date: formData.date,
