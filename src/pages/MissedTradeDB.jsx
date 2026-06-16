@@ -1,20 +1,11 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BarChart, Bar, PieChart, Pie, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
- 
-const MissedTradesDB = () => {
-  // 1. Initialize from Local Storage so missed trades are saved permanently
-  const [missedTrades, setMissedTrades] = useState(() => {
-    const saved = localStorage.getItem('tradingJournalPro_missedTrades');
-    return saved ? JSON.parse(saved) : [];
-  });
 
-  // Automatically save to memory whenever a missed trade is added/deleted
-  useEffect(() => {
-    localStorage.setItem('tradingJournalPro_missedTrades', JSON.stringify(missedTrades));
-  }, [missedTrades]);
-
-  // 2. Form State
+// 🟢 NEW: Accept the database pipeline props from App.jsx!
+const MissedTradesDB = ({ missedTrades = [], onAddMissedTrade, onDeleteMissedTrade }) => {
+  
+  // 1. Form State
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     symbol: 'NIFTY',
@@ -25,32 +16,31 @@ const MissedTradesDB = () => {
     reason: 'Fear'
   });
 
-  // 3. Handle Form Changes
+  // 2. Handle Form Changes
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // 4. Submit Missed Trade
+  // 3. Submit Missed Trade (Wired to Live Database)
   const handleSubmit = (e) => {
     e.preventDefault();
+    
+    // Package it exactly how the MySQL backend expects it
     const newTrade = {
-      id: Date.now(),
       symbol: formData.symbol.toUpperCase(),
       date: formData.date,
-      entryPrice: parseFloat(formData.entryPrice) || 0,
-      exitPrice: parseFloat(formData.exitPrice) || 0,
-      predictedPnL: parseFloat(formData.predictedPnL) || 0,
+      missedEntryPrice: parseFloat(formData.entryPrice) || 0,
+      missedExitPrice: parseFloat(formData.exitPrice) || 0,
+      predictedPnl: parseFloat(formData.predictedPnL) || 0,
       reason: formData.reason,
     };
-    setMissedTrades([newTrade, ...missedTrades]);
+    
+    // Send it to the server instead of Local Storage!
+    onAddMissedTrade(newTrade);
+    
     setShowForm(false);
-    setFormData(prev => ({ ...prev, entryPrice: '', exitPrice: '', predictedPnL: '' })); // Reset numbers, keep symbol/date
-  };
-
-  // 5. Delete Missed Trade
-  const handleDelete = (idToDelete) => {
-    setMissedTrades(prev => prev.filter(t => t.id !== idToDelete));
+    setFormData(prev => ({ ...prev, entryPrice: '', exitPrice: '', predictedPnL: '' })); 
   };
 
   // Helper for formatting currency like -$200 instead of $-200
@@ -61,20 +51,20 @@ const MissedTradesDB = () => {
  
   // Calculate dynamic metrics
   const metrics = useMemo(() => {
-    if (missedTrades.length === 0) {
+    if (!missedTrades || missedTrades.length === 0) {
       return { totalMissed: 0, biggestMissed: 0, biggestMissedSymbol: 'N/A', winRateIfCaught: 0, cumulativeImpact: 0 };
     }
  
-    const totalMissed = missedTrades.reduce((sum, t) => sum + t.predictedPnL, 0);
+    const totalMissed = missedTrades.reduce((sum, t) => sum + (t.predictedPnl || 0), 0);
     const biggestMissedTrade = missedTrades.reduce((prev, current) =>
-      Math.abs(current.predictedPnL) > Math.abs(prev.predictedPnL) ? current : prev
+      Math.abs(current.predictedPnl || 0) > Math.abs(prev.predictedPnl || 0) ? current : prev
     );
-    const winCount = missedTrades.filter(t => t.predictedPnL > 0).length;
+    const winCount = missedTrades.filter(t => (t.predictedPnl || 0) > 0).length;
     const winRate = (winCount / missedTrades.length) * 100;
  
     return {
       totalMissed: parseFloat(totalMissed.toFixed(2)),
-      biggestMissed: Math.abs(biggestMissedTrade.predictedPnL),
+      biggestMissed: Math.abs(biggestMissedTrade.predictedPnl || 0),
       biggestMissedSymbol: biggestMissedTrade.symbol,
       winRateIfCaught: parseFloat(winRate.toFixed(2)),
       cumulativeImpact: parseFloat(totalMissed.toFixed(2)),
@@ -84,7 +74,7 @@ const MissedTradesDB = () => {
   // Pattern analysis calculations
   const reasonBreakdown = useMemo(() => {
     const breakdown = {};
-    missedTrades.forEach(t => {
+    (missedTrades || []).forEach(t => {
       breakdown[t.reason] = (breakdown[t.reason] || 0) + 1;
     });
     return Object.entries(breakdown).map(([reason, count]) => ({ name: reason, value: count }));
@@ -92,7 +82,7 @@ const MissedTradesDB = () => {
  
   const symbolPerformance = useMemo(() => {
     const perf = {};
-    missedTrades.forEach(t => {
+    (missedTrades || []).forEach(t => {
       perf[t.symbol] = (perf[t.symbol] || 0) + 1;
     });
     return Object.entries(perf).map(([symbol, count]) => ({ symbol, count }));
@@ -101,8 +91,8 @@ const MissedTradesDB = () => {
   const cumulativePnL = useMemo(() => {
     let cumulative = 0;
     // Reverse so oldest is first in the chart
-    return [...missedTrades].reverse().map((t, index) => {
-      cumulative += t.predictedPnL;
+    return [...(missedTrades || [])].reverse().map((t, index) => {
+      cumulative += (t.predictedPnl || 0);
       return { trade: index + 1, cumulative: parseFloat(cumulative.toFixed(2)) };
     });
   }, [missedTrades]);
@@ -214,7 +204,7 @@ const MissedTradesDB = () => {
       </AnimatePresence>
 
       {/* RENDER CONTENT ONLY IF TRADES EXIST */}
-      {missedTrades.length === 0 ? (
+      {!missedTrades || missedTrades.length === 0 ? (
         <div style={styles.noData}>
           You haven't logged any missed trades yet.<br/><br/>
           Click <b>"Add Missed Trade"</b> above when you spot a setup you missed!
@@ -248,13 +238,13 @@ const MissedTradesDB = () => {
             {missedTrades.map((trade, index) => (
               <motion.div key={trade.id} style={styles.tradeCard} whileHover={{ boxShadow: '0 0 20px rgba(255, 51, 51, 0.4)' }}>
                 <div style={{ flex: 1 }}>
-                  <div style={styles.tradeSymbol}>{trade.symbol} <span style={{fontSize: '0.8rem', color: '#666', fontWeight: 'normal'}}>- {trade.date}</span></div>
+                  <div style={styles.tradeSymbol}>{trade.symbol} <span style={{fontSize: '0.8rem', color: '#666', fontWeight: 'normal'}}>- {trade.date ? new Date(trade.date).toLocaleDateString() : ''}</span></div>
                   <div style={styles.tradeDetails}>
-                    <div style={styles.detailItem}>Entry: <span style={{color: '#FFF', fontWeight: 'bold'}}>${trade.entryPrice}</span></div>
-                    <div style={styles.detailItem}>Exit: <span style={{color: '#FFF', fontWeight: 'bold'}}>${trade.exitPrice}</span></div>
+                    <div style={styles.detailItem}>Entry: <span style={{color: '#FFF', fontWeight: 'bold'}}>${trade.missedEntryPrice}</span></div>
+                    <div style={styles.detailItem}>Exit: <span style={{color: '#FFF', fontWeight: 'bold'}}>${trade.missedExitPrice}</span></div>
                     <div style={styles.detailItem}>
-                      P&L: <span style={{ ...styles.detailValue, color: trade.predictedPnL >= 0 ? '#00FF88' : '#FF3333' }}>
-                        {formatMoney(trade.predictedPnL)}
+                      P&L: <span style={{ ...styles.detailValue, color: trade.predictedPnl >= 0 ? '#00FF88' : '#FF3333' }}>
+                        {formatMoney(trade.predictedPnl)}
                       </span>
                     </div>
                     <div style={styles.reasonBadge}>{trade.reason}</div>
@@ -262,7 +252,8 @@ const MissedTradesDB = () => {
                 </div>
                 <button 
                   style={styles.deleteBtn} 
-                  onClick={() => handleDelete(trade.id)}
+                  // 🟢 NEW: Call the secure database delete function!
+                  onClick={() => onDeleteMissedTrade(trade.id)}
                   onMouseOver={(e) => { e.target.style.color = '#FF3333'; e.target.style.borderColor = '#FF3333'; }}
                   onMouseOut={(e) => { e.target.style.color = '#B0B0B0'; e.target.style.borderColor = '#B0B0B0'; }}
                 >
