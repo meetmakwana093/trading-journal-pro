@@ -3,7 +3,6 @@ import { motion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, Cell } from 'recharts';
  
 const ReviewPage = ({ trades = [], onUpdateTrade }) => {
-  // --- 100% UNCHANGED LOGIC ---
   const [activeTab, setActiveTab] = useState('daily'); 
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); 
  
@@ -13,168 +12,277 @@ const ReviewPage = ({ trades = [], onUpdateTrade }) => {
     return `${Math.floor(diffMs / (1000 * 60 * 60))}h ${Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))}m`;
   };
  
-  const monthlyTrades = trades.filter(t => t.entryTime && t.entryTime.startsWith(selectedMonth));
-  const monthlyMetrics = useMemo(() => {
-    if (monthlyTrades.length === 0) return { totalTrades: 0, winRate: 0, totalPnL: 0, bestTrade: null, worstTrade: null };
-    const winRate = (monthlyTrades.filter(t => t.profitLoss > 0).length / monthlyTrades.length) * 100;
-    const totalPnL = monthlyTrades.reduce((sum, t) => sum + t.profitLoss, 0);
-    const bestTrade = monthlyTrades.reduce((p, c) => (p.profitLoss > c.profitLoss) ? p : c);
-    const worstTrade = monthlyTrades.reduce((p, c) => (p.profitLoss < c.profitLoss) ? p : c);
-    return { totalTrades: monthlyTrades.length, winRate: parseFloat(winRate.toFixed(2)), totalPnL: parseFloat(totalPnL.toFixed(2)), bestTrade, worstTrade };
-  }, [monthlyTrades]);
-  // --- END LOGIC ---
+  const getTradesForMonth = (month) => trades.filter(t => t.entryTime && t.entryTime.startsWith(month));
+ 
+  const monthlyTrades = getTradesForMonth(selectedMonth);
+  const calculateMonthlyMetrics = (tradeSet) => {
+    if (tradeSet.length === 0) return { totalTrades: 0, winRate: 0, totalPnL: 0, bestTrade: null, worstTrade: null };
+    const winRate = (tradeSet.filter(t => t.profitLoss > 0).length / tradeSet.length) * 100;
+    const totalPnL = tradeSet.reduce((sum, t) => sum + t.profitLoss, 0);
+    const bestTrade = tradeSet.reduce((prev, current) => (prev.profitLoss > current.profitLoss) ? prev : current);
+    const worstTrade = tradeSet.reduce((prev, current) => (prev.profitLoss < current.profitLoss) ? prev : current);
+    return { totalTrades: tradeSet.length, winRate: parseFloat(winRate.toFixed(2)), totalPnL: parseFloat(totalPnL.toFixed(2)), bestTrade, worstTrade };
+  };
+ 
+  const monthlyMetrics = calculateMonthlyMetrics(monthlyTrades);
+ 
+  const pageStyles = {
+    page: { backgroundColor: '#0F0F0F', minHeight: '100vh', padding: '20px', color: 'white' },
+    pageHeader: { textAlign: 'center', marginBottom: '30px', background: 'rgba(0, 255, 136, 0.05)', padding: '30px', borderRadius: '12px', border: '1px solid rgba(0, 255, 136, 0.2)' },
+    headerTitle: { fontSize: '2.5rem', color: '#00FF88', margin: '0 0 10px 0', fontWeight: 'bold' },
+    headerSubtitle: { color: '#B0B0B0', margin: 0, fontSize: '1rem' },
+    tabsContainer: { display: 'flex', gap: '15px', marginBottom: '30px', justifyContent: 'center' },
+    tabBtn: { padding: '12px 30px', background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '8px', color: '#B0B0B0', cursor: 'pointer', fontSize: '1rem', fontWeight: '500', transition: 'all 0.3s' },
+    tabBtnActive: { background: 'rgba(0, 255, 136, 0.1)', color: '#00FF88', border: '1px solid #00FF88', boxShadow: '0 0 20px rgba(0, 255, 136, 0.4)' },
+  };
  
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bento-grid">
-      
-      <div className="bento-card col-span-12" style={{ display: 'flex', justifyContent: 'center', padding: '12px' }}>
-        <div style={{ background: 'rgba(0,0,0,0.4)', borderRadius: '12px', padding: '4px', display: 'flex', gap: '4px', border: '1px solid rgba(255,255,255,0.05)' }}>
-          <button onClick={() => setActiveTab('daily')} style={{ padding: '8px 24px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 600, transition: '0.2s', background: activeTab === 'daily' ? 'rgba(0,255,136,0.15)' : 'transparent', color: activeTab === 'daily' ? '#00FF88' : '#8A8F98' }}>Daily Review</button>
-          <button onClick={() => setActiveTab('monthly')} style={{ padding: '8px 24px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 600, transition: '0.2s', background: activeTab === 'monthly' ? 'rgba(0,255,136,0.15)' : 'transparent', color: activeTab === 'monthly' ? '#00FF88' : '#8A8F98' }}>Monthly Review</button>
-        </div>
+    <motion.div style={pageStyles.page} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <motion.div style={pageStyles.pageHeader} initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
+        <h1 style={pageStyles.headerTitle}>📊 Trade Review</h1>
+        <p style={pageStyles.headerSubtitle}>Analyze your trading performance in detail</p>
+      </motion.div>
+ 
+      <div style={pageStyles.tabsContainer}>
+        <motion.button style={{ ...pageStyles.tabBtn, ...(activeTab === 'daily' && pageStyles.tabBtnActive) }} onClick={() => setActiveTab('daily')} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>📅 Daily Review</motion.button>
+        <motion.button style={{ ...pageStyles.tabBtn, ...(activeTab === 'monthly' && pageStyles.tabBtnActive) }} onClick={() => setActiveTab('monthly')} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>📈 Monthly Review</motion.button>
       </div>
  
-      {activeTab === 'daily' ? <DailyReviewTab trades={trades} onUpdateTrade={onUpdateTrade} /> : <MonthlyReviewTab trades={monthlyTrades} metrics={monthlyMetrics} selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />}
+      <div style={{marginTop: '20px'}}>
+        {activeTab === 'daily' ? <DailyReviewTab trades={trades} calculateTimeTaken={calculateTimeTaken} onUpdateTrade={onUpdateTrade} /> : <MonthlyReviewTab trades={monthlyTrades} metrics={monthlyMetrics} selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} />}
+      </div>
     </motion.div>
   );
 };
  
-const DailyReviewTab = ({ trades, onUpdateTrade }) => {
+const DailyReviewTab = ({ trades, calculateTimeTaken, onUpdateTrade }) => {
+  // NEW: Let the user select the exact date they want to review!
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10)); 
   const [tradeNotes, setTradeNotes] = useState({}); 
   const [editTradeId, setEditTradeId] = useState(null); 
-  const [tempData, setTempData] = useState({ entry: '', exit: '', pnl: '', mistakes: '', lessons: '' });
+  
+  const [tempEntry, setTempEntry] = useState('');
+  const [tempExit, setTempExit] = useState('');
+  const [tempPnL, setTempPnL] = useState('');
+  const [tempMistakes, setTempMistakes] = useState('');
+  const [tempLessons, setTempLessons] = useState('');
  
+  // Get trades only for the specific selected date
   const dailyTrades = trades.filter(t => t.entryTime && t.entryTime.startsWith(selectedDate));
 
   useEffect(() => {
-    const notes = {}; dailyTrades.forEach(t => { notes[t.id] = { mistakes: t.mistakes || '', lessons: t.wentRight || '' }; });
+    const notes = {};
+    dailyTrades.forEach(t => { notes[t.id] = { mistakes: t.mistakes || '', lessonsLearned: t.wentRight || '' }; });
     setTradeNotes(notes);
   }, [trades, selectedDate]);
  
   const handleEdit = (trade) => {
     setEditTradeId(trade.id);
-    setTempData({ entry: trade.entryPrice||0, exit: trade.exitPrice||0, pnl: trade.profitLoss||0, mistakes: tradeNotes[trade.id]?.mistakes||'', lessons: tradeNotes[trade.id]?.lessons||'' });
+    setTempEntry(trade.entryPrice || 0);
+    setTempExit(trade.exitPrice || 0);
+    setTempPnL(trade.profitLoss || 0);
+    setTempMistakes(tradeNotes[trade.id]?.mistakes || '');
+    setTempLessons(tradeNotes[trade.id]?.lessonsLearned || '');
   };
  
   const handleSave = (trade) => {
-    setTradeNotes(prev => ({ ...prev, [trade.id]: { mistakes: tempData.mistakes, lessons: tempData.lessons } }));
-    onUpdateTrade({ ...trade, entryPrice: parseFloat(tempData.entry), exitPrice: parseFloat(tempData.exit), profitLoss: parseFloat(tempData.pnl), win: parseFloat(tempData.pnl) > 0, mistakes: tempData.mistakes, wentRight: tempData.lessons });
+    // Save Notes Locally
+    setTradeNotes(prev => ({ ...prev, [trade.id]: { mistakes: tempMistakes, lessonsLearned: tempLessons } }));
+    
+    // Save Actual Entry/Exit/PnL to Database
+    onUpdateTrade({
+      ...trade,
+      entryPrice: parseFloat(tempEntry),
+      exitPrice: parseFloat(tempExit),
+      profitLoss: parseFloat(tempPnL),
+      win: parseFloat(tempPnL) > 0, // auto update win/loss status
+      mistakes: tempMistakes,
+      wentRight: tempLessons
+    });
+    
     setEditTradeId(null);
   };
  
-  const inputStyle = { background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#FFF', padding: '8px 12px', borderRadius: '8px', outline: 'none', width: '100%' };
-
+  const styles = {
+    sectionTitle: { fontSize: '1.5rem', color: '#00FF88', marginBottom: '20px', fontWeight: 'bold' },
+    tradeCard: { background: 'rgba(26, 26, 26, 0.8)', borderRadius: '12px', padding: '20px', transition: 'all 0.3s' },
+    tradeHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', paddingBottom: '15px', borderBottom: '1px solid rgba(0, 255, 136, 0.1)' },
+    detailRow: { display: 'flex', flexDirection: 'column', gap: '5px' },
+    notesInput: { background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '8px', padding: '10px', color: '#B0B0B0', minHeight: '80px', fontFamily: 'inherit' },
+    shortInput: { background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '8px', padding: '8px', color: '#FFFFFF', width: '100px' }
+  };
+ 
   return (
-    <>
-      <div className="bento-card col-span-12" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <label className="card-label" style={{margin:0}}>Select Date:</label>
-        <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} style={{...inputStyle, width: 'auto'}} />
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <div style={{ marginBottom: '30px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+        <label style={{ color: '#B0B0B0', fontWeight: '500' }}>📆 Select Day:</label>
+        <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} style={{ padding: '10px 15px', background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '8px', color: '#00FF88' }} />
       </div>
 
-      <div className="col-span-12" style={{ display: 'grid', gap: '24px' }}>
-        {dailyTrades.length === 0 ? (
-          <div className="bento-card text-center" style={{color: '#8A8F98'}}>No trades recorded on {selectedDate}.</div>
-        ) : dailyTrades.map(trade => {
-          const isProfitable = trade.profitLoss >= 0;
-          const isEditing = editTradeId === trade.id;
-          return (
-            <div key={trade.id} className="bento-card" style={{ borderLeft: `4px solid ${isProfitable ? '#00FF88' : '#FF3366'}` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{trade.symbol}</span>
-                <span style={{ color: '#8A8F98' }}>{trade.entryTime ? new Date(trade.entryTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</span>
-              </div>
+      <div style={styles.sectionTitle}>Daily Review ({dailyTrades.length} trades)</div>
+      
+      {dailyTrades.length === 0 ? (
+        <div style={{ textAlign: 'center', color: '#B0B0B0', padding: '40px', background: 'rgba(26, 26, 26, 0.5)', borderRadius: '12px', border: '1px dashed rgba(0, 255, 136, 0.2)' }}>No trades recorded on {selectedDate}. Choose another date! 🎯</div>
+      ) : (
+        <div style={{ display: 'grid', gap: '20px' }}>
+          {dailyTrades.map((trade) => {
+            const isProfitable = trade.profitLoss >= 0;
+            const isEditing = editTradeId === trade.id;
 
-              {isEditing ? (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '16px' }}>
-                  <div><span className="card-label">Entry</span><input type="number" style={inputStyle} value={tempData.entry} onChange={e => setTempData({...tempData, entry: e.target.value})} /></div>
-                  <div><span className="card-label">Exit</span><input type="number" style={inputStyle} value={tempData.exit} onChange={e => setTempData({...tempData, exit: e.target.value})} /></div>
-                  <div><span className="card-label">P&L</span><input type="number" style={inputStyle} value={tempData.pnl} onChange={e => setTempData({...tempData, pnl: e.target.value})} /></div>
-                  <div><span className="card-label">Rating</span><div style={{color: '#00FF88', fontWeight: 'bold', marginTop:'10px'}}>{trade.rating}/5</div></div>
-                  
-                  <div style={{ gridColumn: 'span 2' }}><span className="card-label">Mistakes</span><textarea style={{...inputStyle, minHeight:'60px'}} value={tempData.mistakes} onChange={e => setTempData({...tempData, mistakes: e.target.value})} /></div>
-                  <div style={{ gridColumn: 'span 2' }}><span className="card-label">Lessons</span><textarea style={{...inputStyle, minHeight:'60px'}} value={tempData.lessons} onChange={e => setTempData({...tempData, lessons: e.target.value})} /></div>
-                  
-                  <div style={{ gridColumn: 'span 4', display: 'flex', gap: '12px' }}>
-                    <button onClick={() => handleSave(trade)} style={{ padding: '8px 24px', background: '#00FF88', color: '#000', borderRadius: '8px', border: 'none', fontWeight: 'bold', cursor: 'pointer' }}>Save Notes</button>
-                    <button onClick={() => setEditTradeId(null)} style={{ padding: '8px 24px', background: 'transparent', color: '#FF3366', border: '1px solid #FF3366', borderRadius: '8px', cursor: 'pointer' }}>Cancel</button>
-                  </div>
+            return (
+              <motion.div key={trade.id} style={{ ...styles.tradeCard, border: isProfitable ? '1px solid rgba(0, 255, 136, 0.3)' : '1px solid rgba(255, 51, 51, 0.3)' }} whileHover={{ y: -2 }}>
+                <div style={styles.tradeHeader}>
+                  <span style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#00FF88' }}>{trade.symbol}</span>
+                  <span style={{ color: '#B0B0B0' }}>{trade.entryTime ? new Date(trade.entryTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'}</span>
                 </div>
-              ) : (
-                <>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '16px' }}>
-                    <div><span className="card-label">Entry</span><div className="metric-value" style={{fontSize: '1.2rem'}}>${trade.entryPrice}</div></div>
-                    <div><span className="card-label">Exit</span><div className="metric-value" style={{fontSize: '1.2rem'}}>${trade.exitPrice}</div></div>
-                    <div><span className="card-label">P&L</span><div className={`metric-value ${isProfitable?'metric-green':'metric-red'}`} style={{fontSize: '1.2rem'}}>${trade.profitLoss}</div></div>
-                    <div><span className="card-label">Rating</span><div className="metric-value metric-green" style={{fontSize: '1.2rem'}}>{trade.rating}/5</div></div>
-                  </div>
-                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                    <div><span className="card-label">Mistakes</span><p style={{color: '#8A8F98', fontSize: '0.9rem'}}>{tradeNotes[trade.id]?.mistakes || 'None noted'}</p></div>
-                    <div><span className="card-label">Lessons</span><p style={{color: '#8A8F98', fontSize: '0.9rem'}}>{tradeNotes[trade.id]?.lessons || 'None noted'}</p></div>
-                  </div>
-                  <button onClick={() => handleEdit(trade)} style={{ marginTop: '16px', background: 'rgba(255,255,255,0.05)', color: '#FFF', border: 'none', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer' }}>Edit Details</button>
-                </>
-              )}
-            </div>
-          )
-        })}
-      </div>
-    </>
-  )
-};
 
+                {isEditing ? (
+                  // EDIT MODE FOR TRADE DETAILS
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginBottom: '20px' }}>
+                    <div style={styles.detailRow}><span style={{color: '#B0B0B0'}}>Entry</span><input type="number" style={styles.shortInput} value={tempEntry} onChange={(e) => setTempEntry(e.target.value)} /></div>
+                    <div style={styles.detailRow}><span style={{color: '#B0B0B0'}}>Exit</span><input type="number" style={styles.shortInput} value={tempExit} onChange={(e) => setTempExit(e.target.value)} /></div>
+                    <div style={styles.detailRow}><span style={{color: '#B0B0B0'}}>P&L</span><input type="number" style={styles.shortInput} value={tempPnL} onChange={(e) => setTempPnL(e.target.value)} /></div>
+                    <div style={styles.detailRow}><span style={{color: '#B0B0B0'}}>Rating</span><span style={{ color: '#00FF88', fontSize: '1.1rem', fontWeight: 'bold', paddingTop: '8px' }}>{trade.rating || '--'}/5</span></div>
+                  </div>
+                ) : (
+                  // VIEW MODE FOR TRADE DETAILS
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginBottom: '20px' }}>
+                    <div style={styles.detailRow}><span style={{color: '#B0B0B0'}}>Entry</span><span style={{ color: '#FFFFFF', fontSize: '1.1rem', fontWeight: 'bold' }}>${trade.entryPrice || 0}</span></div>
+                    <div style={styles.detailRow}><span style={{color: '#B0B0B0'}}>Exit</span><span style={{ color: '#FFFFFF', fontSize: '1.1rem', fontWeight: 'bold' }}>${trade.exitPrice || 0}</span></div>
+                    <div style={styles.detailRow}><span style={{color: '#B0B0B0'}}>P&L</span><span style={{ color: isProfitable ? '#00FF88' : '#FF3333', fontSize: '1.1rem', fontWeight: 'bold' }}>${trade.profitLoss}</span></div>
+                    <div style={styles.detailRow}><span style={{color: '#B0B0B0'}}>Rating</span><span style={{ color: '#00FF88', fontSize: '1.1rem', fontWeight: 'bold' }}>{trade.rating || '--'}/5</span></div>
+                  </div>
+                )}
+
+                <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid rgba(0, 255, 136, 0.1)' }}>
+                  {isEditing ? (
+                    // EDIT MODE FOR NOTES
+                    <div style={{ display: 'grid', gap: '15px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <span style={{color: '#B0B0B0', fontSize: '0.9rem', fontWeight: '500'}}>❌ Mistakes:</span>
+                        <textarea value={tempMistakes} onChange={(e) => setTempMistakes(e.target.value)} style={styles.notesInput} />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <span style={{color: '#B0B0B0', fontSize: '0.9rem', fontWeight: '500'}}>✅ Lessons learned:</span>
+                        <textarea value={tempLessons} onChange={(e) => setTempLessons(e.target.value)} style={styles.notesInput} />
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <button onClick={() => handleSave(trade)} style={{ flex: 1, padding: '10px 20px', background: '#00FF88', color: '#0F0F0F', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Save</button>
+                        <button onClick={() => setEditTradeId(null)} style={{ flex: 1, padding: '10px 20px', background: 'rgba(255, 51, 51, 0.2)', color: '#FF3333', border: '1px solid #FF3333', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    // VIEW MODE FOR NOTES
+                    <div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '15px' }}>
+                        <span style={{color: '#B0B0B0', fontSize: '0.9rem', fontWeight: '500'}}>❌ Mistakes:</span>
+                        <span style={{color: '#B0B0B0', fontSize: '0.95rem', lineHeight: '1.5'}}>{tradeNotes[trade.id]?.mistakes || 'None noted'}</span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '15px' }}>
+                        <span style={{color: '#B0B0B0', fontSize: '0.9rem', fontWeight: '500'}}>✅ Lessons learned:</span>
+                        <span style={{color: '#B0B0B0', fontSize: '0.95rem', lineHeight: '1.5'}}>{tradeNotes[trade.id]?.lessonsLearned || 'None noted'}</span>
+                      </div>
+                      <button onClick={() => handleEdit(trade)} style={{ padding: '10px 20px', background: 'rgba(0, 255, 136, 0.1)', color: '#00FF88', border: '1px solid #00FF88', borderRadius: '8px', cursor: 'pointer', fontWeight: '500', marginTop: '10px' }}>✏️ Edit Trade & Notes</button>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
+    </motion.div>
+  );
+};
+ 
 const MonthlyReviewTab = ({ trades, metrics, selectedMonth, onMonthChange }) => {
   const [lessons, setLessons] = useState('');
+
   const dailyData = useMemo(() => {
-    const grouped = {}; trades.forEach(t => { if(t.entryTime) grouped[t.entryTime.split('T')[0]] = (grouped[t.entryTime.split('T')[0]] || 0) + t.profitLoss; });
-    return Object.entries(grouped).map(([date, pnl]) => ({ date, pnl: parseFloat(pnl.toFixed(2)) })).sort((a, b) => new Date(a.date) - new Date(b.date));
+    const grouped = {};
+    trades.forEach(t => {
+      if(!t.entryTime) return;
+      const date = t.entryTime.split('T')[0];
+      grouped[date] = (grouped[date] || 0) + t.profitLoss;
+    });
+    return Object.entries(grouped)
+      .map(([date, pnl]) => ({ date, pnl: parseFloat(pnl.toFixed(2)) }))
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
   }, [trades]);
 
+  const isWorstTradeLoss = metrics.worstTrade?.profitLoss < 0;
+ 
+  const styles = {
+    metricCard: { background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '12px', padding: '25px', textAlign: 'center', transition: 'all 0.3s' },
+    tradeCard: { borderRadius: '12px', padding: '25px', transition: 'all 0.3s' },
+    detailRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' },
+    lessonsTextarea: { width: '100%', minHeight: '150px', padding: '20px', background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '12px', color: '#B0B0B0', fontSize: '1rem', fontFamily: 'inherit', resize: 'vertical' },
+  };
+ 
   return (
-    <>
-      <div className="bento-card col-span-12" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <label className="card-label" style={{margin:0}}>Select Month:</label>
-        <input type="month" value={selectedMonth} onChange={(e) => onMonthChange(e.target.value)} style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#FFF', padding: '8px 12px', borderRadius: '8px', outline: 'none' }} />
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <div style={{ marginBottom: '30px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+        <label style={{ color: '#B0B0B0', fontWeight: '500' }}>📆 Select Month:</label>
+        <input type="month" value={selectedMonth} onChange={(e) => onMonthChange(e.target.value)} style={{ padding: '10px 15px', background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '8px', color: '#00FF88' }} />
       </div>
+ 
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '30px' }}>
+        <motion.div style={styles.metricCard} whileHover={{ scale: 1.05 }}><div style={{ color: '#B0B0B0', marginBottom: '10px' }}>Total Trades</div><div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#00FF88' }}>{metrics.totalTrades}</div></motion.div>
+        <motion.div style={styles.metricCard} whileHover={{ scale: 1.05 }}><div style={{ color: '#B0B0B0', marginBottom: '10px' }}>Win Rate</div><div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: metrics.winRate >= 50 ? '#00FF88' : '#FF3333' }}>{metrics.winRate}%</div></motion.div>
+        <motion.div style={styles.metricCard} whileHover={{ scale: 1.05 }}><div style={{ color: '#B0B0B0', marginBottom: '10px' }}>Total P&L</div><div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: metrics.totalPnL >= 0 ? '#00FF88' : '#FF3333' }}>${metrics.totalPnL}</div></motion.div>
+      </div>
+ 
+      {metrics.bestTrade && metrics.worstTrade && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '30px' }}>
+          <motion.div style={{ ...styles.tradeCard, background: 'rgba(0, 255, 136, 0.05)', border: '1px solid rgba(0, 255, 136, 0.3)' }} whileHover={{ scale: 1.05 }}>
+            <div style={{ fontSize: '1.2rem', color: '#00FF88', marginBottom: '15px', fontWeight: 'bold' }}>🏆 Best Trade</div>
+            <div>
+              <div style={styles.detailRow}><span style={{ color: '#B0B0B0' }}>Symbol:</span><span style={{ color: '#00FF88', fontWeight: 'bold', fontSize: '1.1rem' }}>{metrics.bestTrade.symbol}</span></div>
+              <div style={styles.detailRow}><span style={{ color: '#B0B0B0' }}>P&L:</span><span style={{ color: '#00FF88', fontWeight: 'bold', fontSize: '1.1rem' }}>${metrics.bestTrade.profitLoss}</span></div>
+            </div>
+          </motion.div>
 
-      <div className="bento-card col-span-4 text-center"><div className="card-label">Total Trades</div><div className="metric-value text-primary">{metrics.totalTrades}</div></div>
-      <div className="bento-card col-span-4 text-center"><div className="card-label">Win Rate</div><div className={`metric-value ${metrics.winRate >= 50 ? 'metric-green' : 'metric-red'}`}>{metrics.winRate}%</div></div>
-      <div className="bento-card col-span-4 text-center"><div className="card-label">Total P&L</div><div className={`metric-value ${metrics.totalPnL >= 0 ? 'metric-green' : 'metric-red'}`}>${metrics.totalPnL}</div></div>
-
-      {metrics.bestTrade && (
-        <div className="bento-card col-span-6" style={{ background: 'rgba(0,255,136,0.05)', borderColor: 'rgba(0,255,136,0.2)' }}>
-          <div className="card-label metric-green">Best Trade</div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.2rem', fontWeight: 'bold' }}><span>{metrics.bestTrade.symbol}</span><span>+${metrics.bestTrade.profitLoss}</span></div>
+          <motion.div style={{ ...styles.tradeCard, background: isWorstTradeLoss ? 'rgba(255, 51, 51, 0.05)' : 'rgba(0, 255, 136, 0.05)', border: isWorstTradeLoss ? '1px solid rgba(255, 51, 51, 0.3)' : '1px solid rgba(0, 255, 136, 0.3)' }} whileHover={{ scale: 1.05 }}>
+            <div style={{ fontSize: '1.2rem', color: isWorstTradeLoss ? '#FF3333' : '#00FF88', marginBottom: '15px', fontWeight: 'bold' }}>
+              {isWorstTradeLoss ? '📉 Worst Trade' : '🥈 Lowest Profit Trade'}
+            </div>
+            <div>
+              <div style={styles.detailRow}><span style={{ color: '#B0B0B0' }}>Symbol:</span><span style={{ color: isWorstTradeLoss ? '#FF3333' : '#00FF88', fontWeight: 'bold', fontSize: '1.1rem' }}>{metrics.worstTrade.symbol}</span></div>
+              <div style={styles.detailRow}><span style={{ color: '#B0B0B0' }}>P&L:</span><span style={{ color: isWorstTradeLoss ? '#FF3333' : '#00FF88', fontWeight: 'bold', fontSize: '1.1rem' }}>${metrics.worstTrade.profitLoss}</span></div>
+            </div>
+          </motion.div>
         </div>
       )}
-      {metrics.worstTrade && (
-        <div className="bento-card col-span-6" style={{ background: 'rgba(255,51,102,0.05)', borderColor: 'rgba(255,51,102,0.2)' }}>
-          <div className="card-label metric-red">Worst Trade</div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.2rem', fontWeight: 'bold' }}><span>{metrics.worstTrade.symbol}</span><span>${metrics.worstTrade.profitLoss}</span></div>
+
+      <div style={{ marginBottom: '30px' }}>
+        <div style={{ fontSize: '1.2rem', color: '#00FF88', marginBottom: '15px', fontWeight: 'bold' }}>📊 Monthly Performance Chart</div>
+        <div style={{ background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '12px', padding: '20px' }}>
+          {dailyData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={dailyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#3A3A3A" />
+                <XAxis dataKey="date" stroke="#B0B0B0" />
+                <YAxis stroke="#B0B0B0" />
+                <Tooltip contentStyle={{ background: '#262626', border: '1px solid #00FF88', borderRadius: '8px' }} />
+                <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
+                  {dailyData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? '#00FF88' : '#FF3333'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div style={{ textAlign: 'center', color: '#B0B0B0', padding: '60px 20px' }}>No trades logged for this month yet.</div>
+          )}
         </div>
-      )}
-
-      <div className="bento-card col-span-12">
-        <div className="card-label" style={{ marginBottom: '16px' }}>Monthly Performance</div>
-        <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={dailyData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-            <XAxis dataKey="date" stroke="#8A8F98" axisLine={false} tickLine={false} />
-            <YAxis stroke="#8A8F98" axisLine={false} tickLine={false} />
-            <Tooltip contentStyle={{ background: '#111', border: '1px solid rgba(0,255,136,0.2)', borderRadius: '12px' }} />
-            <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
-              {dailyData.map((e, i) => <Cell key={i} fill={e.pnl >= 0 ? '#00FF88' : '#FF3366'} />)}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
       </div>
-
-      <div className="bento-card col-span-12">
-        <div className="card-label">Monthly Lessons</div>
-        <textarea value={lessons} onChange={(e) => setLessons(e.target.value)} placeholder="Type lessons learned..." style={{ width: '100%', minHeight: '120px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#FFF', padding: '16px', borderRadius: '12px', outline: 'none', resize: 'vertical' }} />
+ 
+      <div>
+        <div style={{ fontSize: '1.2rem', color: '#00FF88', marginBottom: '15px', fontWeight: 'bold' }}>💡 Key Lessons Learned</div>
+        <textarea value={lessons} onChange={(e) => setLessons(e.target.value)} placeholder="Enter key lessons learned this month..." style={styles.lessonsTextarea} />
       </div>
-    </>
-  )
+    </motion.div>
+  );
 };
  
 export default ReviewPage;
