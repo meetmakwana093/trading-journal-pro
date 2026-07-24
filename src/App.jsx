@@ -378,175 +378,264 @@ export default function App() {
 
       <div className="main-content">
         {activeTab === 'home' ? (
-          <>
-            <div className="left-column">
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <motion.div whileHover={{ boxShadow: '0 0 20px rgba(0, 255, 136, 0.4)' }} style={{ background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '12px', padding: '20px' }}>
-                  <h3 style={{ color: '#00FF88', margin: '0 0 15px 0', fontSize: '1.1rem', textAlign: 'center' }}>🎯 Performance Profile</h3>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <RadarChart cx="50%" cy="50%" outerRadius="70%" data={profileData}>
-                      <PolarGrid stroke="#3A3A3A" />
-                      <PolarAngleAxis dataKey="subject" tick={{ fill: '#B0B0B0', fontSize: 10 }} />
-                      <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                      <Radar name="Performance" dataKey="A" stroke="#00FF88" fill="#00FF88" fillOpacity={0.3} />
-                      <Tooltip contentStyle={{ background: '#262626', border: '1px solid #00FF88', borderRadius: '8px' }} />
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: [0.25, 0.1, 0.25, 1] }}>
+            <div className="bento-grid">
+              <div className="bento-item">
+                {/* Left column: Performance Profile and Daily Performance */}
+                <motion.div initial={{ opacity: 0, x: -50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2, duration: 0.8 }}>
+                  <motion.div whileHover={{
+                    boxShadow: '0 0 20px rgba(0, 255, 136, 0.4)',
+                    transform: 'scale(1.02)'
+                  }} style={{
+                    background: 'rgba(26, 26, 26, 0.8)',
+                    border: '1px solid rgba(0, 255, 136, 0.3)',
+                    borderRadius: '12px',
+                    padding: '20px'
+                  }}>
+                    <h3 style={{ color: '#00FF88', margin: '0 0 15px 0', fontSize: '1.1rem', textAlign: 'center' }}>🎯 Performance Profile</h3>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <RadarChart cx="50%" cy="50%" outerRadius="70%" data={profileData}>
+                        <PolarGrid stroke="#3A3A3A" />
+                        <PolarAngleAxis dataKey="subject" tick={{ fill: '#B0B0B0', fontSize: 10 }} />
+                        <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                        <Radar name="Performance" dataKey="A" stroke="#00FF88" fill="#00FF88" fillOpacity={0.3} />
+                        <Tooltip contentStyle={{ background: '#262626', border: '1px solid #00FF88', borderRadius: '8px' }} />
                     </RadarChart>
                   </ResponsiveContainer>
                 </motion.div>
-                <motion.div whileHover={{ boxShadow: '0 0 20px rgba(0, 255, 136, 0.4)' }} style={{ background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '12px', padding: '20px' }}>
-                  <h3 style={{ color: '#00FF88', margin: '0 0 15px 0', fontSize: '1.1rem', textAlign: 'center' }}>📅 Daily Performance</h3>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <BarChart data={dowData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#3A3A3A" vertical={false} />
-                      <XAxis dataKey="day" stroke="#B0B0B0" />
-                      <YAxis stroke="#B0B0B0" />
-                      <Tooltip contentStyle={{ background: '#262626', border: '1px solid #00FF88', borderRadius: '8px' }} />
-                      <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
-                        {dowData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? '#00FF88' : '#FF3333'} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <motion.div whileHover={{
+                    boxShadow: '0 0 20px rgba(0, 255, 136, 0.4)',
+                    transform: 'scale(1.02)'
+                  }} style={{
+                    background: 'rgba(26, 26, 26, 0.8)',
+                    border: '1px solid rgba(0, 255, 136, 0.3)',
+                    borderRadius: '12px',
+                    padding: '20px'
+                  }}>
+                    <h3 style={{ color: '#00FF88', margin: '0 0 15px 0', fontSize: '1.1rem', textAlign: 'center' }}>📅 Daily Performance</h3>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <BarChart data={dowData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#3A3A3A" vertical={false} />
+                        <XAxis dataKey="day" stroke="#B0B0B0" />
+                        <YAxis stroke="#B0B0B0" />
+                        <Tooltip contentStyle={{ background: '#262626', border: '1px solid #00FF88', borderRadius: '8px' }} />
+                        <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
+                          {dowData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? '#00FF88' : '#FF3333'} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </motion.div>
                 </motion.div>
-              </motion.div>
-            </div>
-
-            <div className="center-column">
-              <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} style={{ textAlign: 'center', marginBottom: '30px', background: 'rgba(0, 255, 136, 0.05)', padding: '30px', borderRadius: '12px', border: '1px solid rgba(0, 255, 136, 0.2)' }}>
-                <h1 style={{ fontSize: '2.5rem', color: '#00FF88', margin: '0 0 10px 0', fontWeight: 'bold' }}>Trading Dashboard</h1>
-                <p style={{ color: '#B0B0B0', margin: '10px 0 20px 0', fontSize: '1rem' }}>
-                  <span style={{ color: '#00FF88', fontWeight: 'bold' }}>Win Rate: {metrics.winRate}%</span>
-                  <span style={{ margin: '0 20px', color: '#666' }}>•</span>
-                  <span style={{ color: metrics.totalPnL >= 0 ? '#00FF88' : '#FF3333', fontWeight: 'bold' }}>Total P&L: ${metrics.totalPnL}</span>
-                  <span style={{ margin: '0 20px', color: '#666' }}>•</span>
-                  <span style={{ color: '#00FF88', fontWeight: 'bold' }}>Profit Factor: {metrics.profitFactor}</span>
-                </p>
-              </motion.div>
-
-              <motion.div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginBottom: '30px' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ staggerChildren: 0.1 }}>
-                <motion.div whileHover={{ scale: 1.08, boxShadow: '0 0 25px rgba(0, 255, 136, 0.6)' }} style={{ background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '12px', padding: '20px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.3s' }}>
-                  <div style={{ color: '#B0B0B0', fontSize: '0.9rem', marginBottom: '10px' }}>Win Rate</div>
-                  <div style={{ color: '#00FF88', fontSize: '2.5rem', fontWeight: 'bold' }}>{metrics.winRate}%</div>
-                </motion.div>
-                <motion.div whileHover={{ scale: 1.08, boxShadow: metrics.totalPnL >= 0 ? '0 0 25px rgba(0, 255, 136, 0.6)' : '0 0 25px rgba(255, 51, 51, 0.6)' }} style={{ background: 'rgba(26, 26, 26, 0.8)', border: metrics.totalPnL >= 0 ? '1px solid rgba(0, 255, 136, 0.3)' : '1px solid rgba(255, 51, 51, 0.3)', borderRadius: '12px', padding: '20px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.3s' }}>
-                  <div style={{ color: '#B0B0B0', fontSize: '0.9rem', marginBottom: '10px' }}>Total P&L</div>
-                  <div style={{ color: metrics.totalPnL >= 0 ? '#00FF88' : '#FF3333', fontSize: '2.5rem', fontWeight: 'bold' }}>${metrics.totalPnL}</div>
-                </motion.div>
-                <motion.div whileHover={{ scale: 1.08, boxShadow: '0 0 25px rgba(0, 255, 136, 0.6)' }} style={{ background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '12px', padding: '20px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.3s' }}>
-                  <div style={{ color: '#B0B0B0', fontSize: '0.9rem', marginBottom: '10px' }}>Returns</div>
-                  <div style={{ color: metrics.returns >= 0 ? '#00FF88' : '#FF3333', fontSize: '2.5rem', fontWeight: 'bold' }}>{metrics.returns}%</div>
-                </motion.div>
-                <motion.div whileHover={{ scale: 1.08, boxShadow: '0 0 25px rgba(0, 255, 136, 0.6)' }} style={{ background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '12px', padding: '20px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.3s' }}>
-                  <div style={{ color: '#B0B0B0', fontSize: '0.9rem', marginBottom: '10px' }}>Profit Factor</div>
-                  <div style={{ color: '#00FF88', fontSize: '2.5rem', fontWeight: 'bold' }}>{metrics.profitFactor}</div>
-                </motion.div>
-              </motion.div>
-
-              <motion.div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '30px' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <motion.div whileHover={{ boxShadow: '0 0 20px rgba(0, 255, 136, 0.4)' }} style={{ background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '12px', padding: '20px' }}>
-                  <h3 style={{ color: '#00FF88', margin: '0 0 15px 0', fontSize: '1.1rem' }}>📈 Account Growth</h3>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <LineChart data={calculateAccountGrowth(trades)}>
-                      <defs>
-                        <linearGradient id="lineGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#00FF88" stopOpacity={0.8} />
-                          <stop offset="95%" stopColor="#00FF88" stopOpacity={0.2} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#3A3A3A" />
-                      <XAxis dataKey="trade" stroke="#B0B0B0" />
-                      <YAxis stroke="#B0B0B0" />
-                      <Tooltip contentStyle={{ background: '#262626', border: '1px solid #00FF88', borderRadius: '8px' }} />
-                      <Line type="monotone" dataKey="cumulative" stroke="#00FF88" strokeWidth={3} isAnimationActive={true} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </motion.div>
-                <motion.div whileHover={{ boxShadow: '0 0 20px rgba(0, 255, 136, 0.4)' }} style={{ background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '12px', padding: '20px' }}>
-                  <h3 style={{ color: '#00FF88', margin: '0 0 15px 0', fontSize: '1.1rem' }}>📊 Symbol Performance</h3>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <BarChart data={symbolData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#3A3A3A" />
-                      <XAxis dataKey="symbol" stroke="#B0B0B0" />
-                      <YAxis stroke="#B0B0B0" />
-                      <Tooltip contentStyle={{ background: '#262626', border: '1px solid #00FF88', borderRadius: '8px' }} />
-                      <Bar dataKey="pnl" radius={[8, 8, 0, 0]}>
-                        {symbolData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? '#00FF88' : '#FF3333'} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </motion.div>
-              </motion.div>
-
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '12px', padding: '20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
-                  <button
-                    onClick={handlePrevMonth}
-                    style={{ background: 'rgba(0,255,136,0.1)', border: '1px solid rgba(0,255,136,0.3)', color: '#00FF88', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold' }}
-                    onMouseEnter={e => e.target.style.background = 'rgba(0,255,136,0.25)'}
-                    onMouseLeave={e => e.target.style.background = 'rgba(0,255,136,0.1)'}
-                  >←</button>
-                  <h3 style={{ color: '#00FF88', margin: 0, fontSize: '1.1rem' }}>📅 {currentMonthName} {currentYear}</h3>
-                  <button
-                    onClick={handleNextMonth}
-                    style={{ background: 'rgba(0,255,136,0.1)', border: '1px solid rgba(0,255,136,0.3)', color: '#00FF88', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold' }}
-                    onMouseEnter={e => e.target.style.background = 'rgba(0,255,136,0.25)'}
-                    onMouseLeave={e => e.target.style.background = 'rgba(0,255,136,0.1)'}
-                  >→</button>
-                </div>
-                <div className="calendar-header">
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
-                    <div key={index}>{day}</div>
-                  ))}
-                </div>
-                <div className="calendar-days">
-                  {Array.from({ length: firstDayOfMonth }).map((_, i) => (
-                    <div key={`empty-${i}`} className="calendar-day" style={{ visibility: 'hidden' }}></div>
-                  ))}
-                  {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
-                    const monthStr = (currentMonth + 1).toString().padStart(2, '0');
-                    const dayStr = day.toString().padStart(2, '0');
-                    const dateStr = `${currentYear}-${monthStr}-${dayStr}`;
-                    const data = calendarData[dateStr];
-                    const isWeekend = new Date(currentYear, currentMonth, day).getDay() === 0 || new Date(currentYear, currentMonth, day).getDay() === 6;
-                    const dayClass = data ? (data.pnl > 0 ? 'positive' : data.pnl < 0 ? 'negative' : 'neutral') : isWeekend ? 'weekend' : '';
-                    return (
-                      <motion.div key={dateStr} whileHover={{ scale: 1.1, boxShadow: '0 0 15px rgba(0, 255, 136, 0.5)' }} className={`calendar-day ${dayClass}`} style={{ transition: 'all 0.3s' }}>
-                        <div className="calendar-day-number">{day}</div>
-                        {data && <div className="calendar-day-pnl">{formatCurrency(data.pnl)}</div>}
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              </motion.div>
-            </div>
-
-            <div className="right-column">
-              <div className="section-title">Win Rate</div>
-              <div className="info-card">
-                <div className={`info-card-value ${metrics.winRate >= 50 ? 'positive' : 'negative'}`}>
-                  {metrics.winRate}%
-                </div>
               </div>
-              <div className="section-title">Info Cards</div>
-              <div className="info-cards">
-                <div className="info-card">
-                  <div className="info-card-title">Avg Win</div>
-                  <div className="info-card-value positive">{formatCurrency(metrics.avgWin)}</div>
-                </div>
-                <div className="info-card">
-                  <div className="info-card-title">Avg Loss</div>
-                  <div className="info-card-value negative" style={{ color: '#FF3333' }}>{formatCurrency(metrics.avgLoss)}</div>
-                </div>
-                <div className="info-card">
-                  <div className="info-card-title">Max Drawdown</div>
-                  <div className="info-card-value" style={{ color: '#FF3333' }}>{metrics.maxDrawdown}%</div>
-                </div>
+              <div className="bento-item">
+                {/* Center column: Trading Dashboard heading, metrics, four metric cards, two charts, calendar */}
+                <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4, duration: 0.8 }}>
+                  <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} style={{ textAlign: 'center', marginBottom: '30px', background: 'rgba(0, 255, 136, 0.05)', padding: '30px', borderRadius: '12px', border: '1px solid rgba(0, 255, 136, 0.2)' }}>
+                    <h1 style={{ fontSize: '2.5rem', color: '#00FF88', margin: '0 0 10px 0', fontWeight: 'bold' }}>Trading Dashboard</h1>
+                    <p style={{ color: '#B0B0B0', margin: '10px 0 20px 0', fontSize: '1rem' }}>
+                      <span style={{ color: '#00FF88', fontWeight: 'bold' }}>Win Rate: {metrics.winRate}%</span>
+                      <span style={{ margin: '0 20px', color: '#666' }}>•</span>
+                      <span style={{ color: metrics.totalPnL >= 0 ? '#00FF88' : '#FF3333', fontWeight: 'bold' }}>Total P&L: ${metrics.totalPnL}</span>
+                      <span style={{ margin: '0 20px', color: '#666' }}>•</span>
+                      <span style={{ color: '#00FF88', fontWeight: 'bold' }}>Profit Factor: {metrics.profitFactor}</span>
+                    </p>
+                  </motion.div>
+
+                  <motion.div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginBottom: '30px' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6, staggerChildren: 0.1 }}>
+                    <motion.div whileHover={{
+                      scale: 1.08,
+                      boxShadow: metrics.totalPnL >= 0 ? '0 0 25px rgba(0, 255, 136, 0.6)' : '0 0 25px rgba(255, 51, 51, 0.6)'
+                    }} style={{
+                      background: 'rgba(26, 26, 26, 0.8)',
+                      border: metrics.totalPnL >= 0 ? '1px solid rgba(0, 255, 136, 0.3)' : '1px solid rgba(255, 51, 51, 0.3)',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s'
+                    }}>
+                      <div style={{ color: '#B0B0B0', fontSize: '0.9rem', marginBottom: '10px' }}>Win Rate</div>
+                      <div style={{ color: '#00FF88', fontSize: '2.5rem', fontWeight: 'bold' }}>{metrics.winRate}%</div>
+                    </motion.div>
+                    <motion.div whileHover={{
+                      scale: 1.08,
+                      boxShadow: metrics.totalPnL >= 0 ? '0 0 25px rgba(0, 255, 136, 0.6)' : '0 0 25px rgba(255, 51, 51, 0.6)'
+                    }} style={{
+                      background: 'rgba(26, 26, 26, 0.8)',
+                      border: metrics.totalPnL >= 0 ? '1px solid rgba(0, 255, 136, 0.3)' : '1px solid rgba(255, 51, 51, 0.3)',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s'
+                    }}>
+                      <div style={{ color: '#B0B0B0', fontSize: '0.9rem', marginBottom: '10px' }}>Total P&L</div>
+                      <div style={{ color: metrics.totalPnL >= 0 ? '#00FF88' : '#FF3333', fontSize: '2.5rem', fontWeight: 'bold' }}>${metrics.totalPnL}</div>
+                    </motion.div>
+                    <motion.div whileHover={{
+                      scale: 1.08,
+                      boxShadow: '0 0 25px rgba(0, 255, 136, 0.6)'
+                    }} style={{
+                      background: 'rgba(26, 26, 26, 0.8)',
+                      border: '1px solid rgba(0, 255, 136, 0.3)',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s'
+                    }}>
+                      <div style={{ color: '#B0B0B0', fontSize: '0.9rem', marginBottom: '10px' }}>Returns</div>
+                      <div style={{ color: metrics.returns >= 0 ? '#00FF88' : '#FF3333', fontSize: '2.5rem', fontWeight: 'bold' }}>{metrics.returns}%</div>
+                    </motion.div>
+                    <motion.div whileHover={{
+                      scale: 1.08,
+                      boxShadow: '0 0 25px rgba(0, 255, 136, 0.6)'
+                    }} style={{
+                      background: 'rgba(26, 26, 26, 0.8)',
+                      border: '1px solid rgba(0, 255, 136, 0.3)',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s'
+                    }}>
+                      <div style={{ color: '#B0B0B0', fontSize: '0.9rem', marginBottom: '10px' }}>Profit Factor</div>
+                      <div style={{ color: '#00FF88', fontSize: '2.5rem', fontWeight: 'bold' }}>{metrics.profitFactor}</div>
+                    </motion.div>
+                  </motion.div>
+
+                  <motion.div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '30px' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }}>
+                    <motion.div whileHover={{
+                      boxShadow: '0 0 20px rgba(0, 255, 136, 0.4)',
+                      transform: 'scale(1.02)'
+                    }} style={{
+                      background: 'rgba(26, 26, 26, 0.8)',
+                      border: '1px solid rgba(0, 255, 136, 0.3)',
+                      borderRadius: '12px',
+                      padding: '20px'
+                    }}>
+                      <h3 style={{ color: '#00FF88', margin: '0 0 15px 0', fontSize: '1.1rem' }}>📈 Account Growth</h3>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <LineChart data={calculateAccountGrowth(trades)}>
+                          <defs>
+                            <linearGradient id="lineGradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#00FF88" stopOpacity={0.8} />
+                              <stop offset="95%" stopColor="#00FF88" stopOpacity={0.2} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#3A3A3A" />
+                          <XAxis dataKey="trade" stroke="#B0B0B0" />
+                          <YAxis stroke="#B0B0B0" />
+                          <Tooltip contentStyle={{ background: '#262626', border: '1px solid #00FF88', borderRadius: '8px' }} />
+                          <Line type="monotone" dataKey="cumulative" stroke="#00FF88" strokeWidth={3} isAnimationActive={true} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </motion.div>
+                    <motion.div whileHover={{
+                      boxShadow: '0 0 20px rgba(0, 255, 136, 0.4)',
+                      transform: 'scale(1.02)'
+                    }} style={{
+                      background: 'rgba(26, 26, 26, 0.8)',
+                      border: '1px solid rgba(0, 255, 136, 0.3)',
+                      borderRadius: '12px',
+                      padding: '20px'
+                    }}>
+                      <h3 style={{ color: '#00FF88', margin: '0 0 15px 0', fontSize: '1.1rem' }}>📊 Symbol Performance</h3>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <BarChart data={symbolData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#3A3A3A" />
+                          <XAxis dataKey="symbol" stroke="#B0B0B0" />
+                          <YAxis stroke="#B0B0B0" />
+                          <Tooltip contentStyle={{ background: '#262626', border: '1px solid #00FF88', borderRadius: '8px' }} />
+                          <Bar dataKey="pnl" radius={[8, 8, 0, 0]}>
+                            {symbolData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? '#00FF88' : '#FF3333'} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </motion.div>
+                  </motion.div>
+
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.0, duration: 0.8 }} style={{ background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '12px', padding: '20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
+                      <button
+                        onClick={handlePrevMonth}
+                        style={{ background: 'rgba(0,255,136,0.1)', border: '1px solid rgba(0,255,136,0.3)', color: '#00FF88', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold' }}
+                        onMouseEnter={e => e.target.style.background = 'rgba(0,255,136,0.25)'}
+                        onMouseLeave={e => e.target.style.background = 'rgba(0,255,136,0.1)'}
+                      >←</button>
+                      <h3 style={{ color: '#00FF88', margin: 0, fontSize: '1.1rem' }}>📅 {currentMonthName} {currentYear}</h3>
+                      <button
+                        onClick={handleNextMonth}
+                        style={{ background: 'rgba(0,255,136,0.1)', border: '1px solid rgba(0,255,136,0.3)', color: '#00FF88', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontSize: '1.2rem', fontWeight: 'bold' }}
+                        onMouseEnter={e => e.target.style.background = 'rgba(0,255,136,0.25)'}
+                        onMouseLeave={e => e.target.style.background = 'rgba(0,255,136,0.1)'}
+                      >→</button>
+                    </div>
+                    <div className="calendar-header">
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
+                        <div key={index}>{day}</div>
+                      ))}
+                    </div>
+                    <div className="calendar-days">
+                      {Array.from({ length: firstDayOfMonth }).map((_, i) => (
+                        <div key={`empty-${i}`} className="calendar-day" style={{ visibility: 'hidden' }}></div>
+                      ))}
+                      {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
+                        const monthStr = (currentMonth + 1).toString().padStart(2, '0');
+                        const dayStr = day.toString().padStart(2, '0');
+                        const dateStr = `${currentYear}-${monthStr}-${dayStr}`;
+                        const data = calendarData[dateStr];
+                        const isWeekend = new Date(currentYear, currentMonth, day).getDay() === 0 || new Date(currentYear, currentMonth, day).getDay() === 6;
+                        const dayClass = data ? (data.pnl > 0 ? 'positive' : data.pnl < 0 ? 'negative' : 'neutral') : isWeekend ? 'weekend' : '';
+                        return (
+                          <motion.div key={dateStr} whileHover={{ scale: 1.1, boxShadow: '0 0 15px rgba(0, 255, 136, 0.5)' }} className={`calendar-day ${dayClass}`} style={{ transition: 'all 0.3s' }}>
+                            <div className="calendar-day-number">{day}</div>
+                            {data && <div className="calendar-day-pnl">{formatCurrency(data.pnl)}</div>}
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                </motion.div>
+              </div>
+              <div className="bento-item">
+                {/* Right column: Win Rate section and Info Cards */}
+                <motion.div initial={{ opacity: 0, x: -50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1.2, duration: 0.8 }}>
+                  <div className="section-title">Win Rate</div>
+                  <div className="info-card">
+                    <div className={`info-card-value ${metrics.winRate >= 50 ? 'positive' : 'negative'}`}>
+                      {metrics.winRate}%
+                    </div>
+                  </div>
+                  <div className="section-title">Info Cards</div>
+                  <div className="info-cards">
+                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.4, duration: 0.6 }}>
+                      <div className="info-card">
+                        <div className="info-card-title">Avg Win</div>
+                        <div className="info-card-value positive">{formatCurrency(metrics.avgWin)}</div>
+                      </div>
+                    </motion.div>
+                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.6, duration: 0.6 }}>
+                      <div className="info-card">
+                        <div className="info-card-title">Avg Loss</div>
+                        <div className="info-card-value negative" style={{ color: '#FF3333' }}>{formatCurrency(metrics.avgLoss)}</div>
+                      </div>
+                    </motion.div>
+                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.8, duration: 0.6 }}>
+                      <div className="info-card">
+                        <div className="info-card-title">Max Drawdown</div>
+                        <div className="info-card-value" style={{ color: '#FF3333' }}>{metrics.maxDrawdown}%</div>
+                      </div>
+                    </motion.div>
+                  </div>
+                </motion.div>
               </div>
             </div>
-          </>
+          </motion.div>
         ) : (
           <div style={{ flex: 1, width: '100%', maxWidth: '100%' }}>
             {activeTab === 'analytics' ? (
