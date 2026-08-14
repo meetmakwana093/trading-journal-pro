@@ -128,7 +128,7 @@ export default function App() {
       .then(res => res.json())
       .then(data => { if (Array.isArray(data)) setMissedTrades(data.map(formatMissedTradeData)); })
       .catch(err => console.error('Failed to fetch missed trades:', err));
-    
+
     // 🟢 NEW: Fetch Playbooks
     fetch(`${API}/playbooks`, { headers: { 'Authorization': `Bearer ${getToken()}` } })
       .then(res => res.json())
@@ -604,7 +604,13 @@ export default function App() {
               ) : activeTab === 'missedTradesDb' ? (
                 <MissedTradeDB missedTrades={missedTrades} onAddMissedTrade={handleAddMissedTrade} onDeleteMissedTrade={handleDeleteMissedTrade} />
               ) : activeTab === 'tradesDb' ? (
-                <TradesDB trades={trades} playbooks={playbooks} onAddTrade={handleAddTrade} onDeleteTrade={handleDeleteTrade} />
+                <TradesDB
+                  trades={trades}
+                  playbooks={playbooks}
+                  onAddTrade={handleAddTrade}
+                  onDeleteTrade={handleDeleteTrade}
+                  onUpdateTrade={handleUpdateTrade} // 🟢 ADD THIS LINE
+                />
               ) : (
                 <div className="tab-content">Content for {activeTab}</div>
               )}

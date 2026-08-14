@@ -1,19 +1,22 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
+// 🟢 NEW: Added onUpdateTrade to props
+const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateTrade }) => {
   
   // Form State
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({
+  const [editingTradeId, setEditingTradeId] = useState(null); // 🟢 NEW: Tracks which trade is being edited
+
+  const defaultFormState = {
     symbol: 'EURUSD',
     date: new Date().toISOString().split('T')[0],
     session: 'New York',
     direction: 'LONG',
     entryPrice: '',
-    stopLoss: '', // 🟢 NEW
+    stopLoss: '',
     exitPrice: '',
-    playbookId: '', // 🟢 NEW
+    playbookId: '',
     profitLoss: 0,
     followedPlan: true,
     be: false,
@@ -22,9 +25,11 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
     negativeTags: '',
     account: 'Account1',
     rating: 5
-  });
+  };
 
-  // 🟢 NEW: Calculate R-Multiple automatically
+  const [formData, setFormData] = useState(defaultFormState);
+
+  // Calculate R-Multiple automatically
   const calculatedRR = useMemo(() => {
     const entry = parseFloat(formData.entryPrice);
     const exit = parseFloat(formData.exitPrice);
@@ -46,7 +51,32 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
     }));
   };
 
-  // Submit New Trade
+  // 🟢 NEW: Handle Edit Button Click
+  const handleEditClick = (trade) => {
+    setEditingTradeId(trade.id);
+    setFormData({
+      symbol: trade.symbol,
+      date: trade.date || trade.entryTime.split(' ')[0], // Extract date part safely
+      session: trade.session || 'New York',
+      direction: trade.direction || 'LONG',
+      entryPrice: trade.entryPrice === 0 ? '' : trade.entryPrice,
+      stopLoss: trade.stopLoss === 0 ? '' : trade.stopLoss,
+      exitPrice: trade.exitPrice === 0 ? '' : trade.exitPrice,
+      playbookId: trade.playbookId || '',
+      profitLoss: trade.profitLoss,
+      followedPlan: trade.followedPlan !== false,
+      be: trade.be || false,
+      entryWindow: trade.entryWindow || '',
+      positiveTags: trade.positiveTags ? trade.positiveTags.join(', ') : '',
+      negativeTags: trade.negativeTags ? trade.negativeTags.join(', ') : '',
+      account: trade.account || 'Account1',
+      rating: trade.rating || 5
+    });
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' }); // Scroll up to see the form
+  };
+
+  // Submit New or Edited Trade
   const handleSubmit = (e) => {
     e.preventDefault();
     const dateObj = new Date(formData.date);
@@ -55,14 +85,14 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
     const selectedPb = playbooks.find(p => p.id === parseInt(formData.playbookId));
     const modelName = selectedPb ? selectedPb.name : 'Custom / Manual';
 
-    const newTrade = {
-      id: Date.now(), 
+    const tradePayload = {
+      id: editingTradeId || Date.now(), // 🟢 NEW: Use existing ID if editing
       symbol: formData.symbol.toUpperCase(),
       entryPrice: parseFloat(formData.entryPrice) || 0,
-      stopLoss: parseFloat(formData.stopLoss) || 0, // 🟢 NEW
+      stopLoss: parseFloat(formData.stopLoss) || 0,
       exitPrice: parseFloat(formData.exitPrice) || 0,
       profitLoss: parseFloat(formData.profitLoss),
-      riskReward: calculatedRR, // 🟢 NEW
+      riskReward: calculatedRR,
       entryTime: dateObj.toISOString().slice(0, 19).replace('T', ' '),
       
       date: formData.date,
@@ -72,8 +102,8 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
       followedPlan: formData.followedPlan,
       be: formData.be,
       entryWindow: formData.entryWindow,
-      model: modelName, // 🟢 NEW
-      playbookId: formData.playbookId ? parseInt(formData.playbookId) : null, // 🟢 NEW
+      model: modelName,
+      playbookId: formData.playbookId ? parseInt(formData.playbookId) : null,
       positiveTags: formData.positiveTags.split(',').map(t => t.trim()).filter(t => t),
       negativeTags: formData.negativeTags.split(',').map(t => t.trim()).filter(t => t),
       account: formData.account,
@@ -84,9 +114,16 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
       year: dateObj.getFullYear()
     };
 
-    onAddTrade(newTrade); 
+    // 🟢 NEW: Route to the correct App.jsx function
+    if (editingTradeId) {
+      onUpdateTrade(tradePayload);
+      setEditingTradeId(null);
+    } else {
+      onAddTrade(tradePayload); 
+    }
+    
     setShowForm(false); 
-    setFormData(prev => ({ ...prev, profitLoss: 0, entryPrice: '', exitPrice: '', stopLoss: '', positiveTags: '', negativeTags: '' }));
+    setFormData(defaultFormState);
   };
 
   // Calculate Footer Summary Metrics
@@ -96,18 +133,18 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
     const planFollowed = trades.filter(t => t.followedPlan).length;
     const totalWins = trades.filter(t => (t.win || t.profitLoss > 0)).length;
     const totalRating = trades.reduce((sum, t) => sum + (t.rating || 5), 0);
-    const totalRR = trades.reduce((sum, t) => sum + (t.riskReward || 0), 0); // 🟢 NEW
+    const totalRR = trades.reduce((sum, t) => sum + (t.riskReward || 0), 0);
 
     return {
       totalPnL: totalPnL.toFixed(2),
       planPercent: ((planFollowed / trades.length) * 100).toFixed(0),
       avgRating: (totalRating / trades.length).toFixed(2),
       winRate: ((totalWins / trades.length) * 100).toFixed(2),
-      avgRR: (totalRR / trades.length).toFixed(2) // 🟢 NEW
+      avgRR: (totalRR / trades.length).toFixed(2)
     };
   }, [trades]);
 
-  // Styles (100% Original styling from TradeDB_2)
+  // Styles (100% Original styling)
   const styles = {
     container: { backgroundColor: '#191919', color: '#E0E0E0', minHeight: '100vh', padding: '20px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif' },
     header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
@@ -119,11 +156,12 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
     label: { fontSize: '12px', color: '#9B9A97', fontWeight: 'bold', textTransform: 'uppercase' },
     input: { backgroundColor: '#191919', border: '1px solid rgba(255,255,255,0.1)', color: '#FFFFFF', padding: '8px 12px', borderRadius: '4px', fontSize: '14px', outline: 'none' },
     checkboxGroup: { display: 'flex', alignItems: 'center', gap: '8px', height: '100%', paddingTop: '15px' },
-    submitButton: { backgroundColor: '#219653', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', marginTop: '20px', width: '100%' },
+    submitButton: { backgroundColor: editingTradeId ? '#2D9CDB' : '#219653', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', marginTop: '20px', width: '100%' },
     tableWrapper: { overflowX: 'auto', paddingBottom: '20px' },
     table: { width: '100%', minWidth: '1700px', borderCollapse: 'collapse', fontSize: '14px' },
     th: { textAlign: 'left', padding: '12px 16px', color: '#9B9A97', fontWeight: '500', borderBottom: '1px solid rgba(255,255,255,0.1)', whiteSpace: 'nowrap' },
     td: { padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', whiteSpace: 'nowrap' },
+    editBtn: { backgroundColor: 'transparent', color: '#2D9CDB', border: '1px solid rgba(45, 156, 219, 0.4)', borderRadius: '4px', cursor: 'pointer', padding: '4px 8px', fontSize: '12px', transition: 'all 0.2s', marginRight: '8px' }, // 🟢 NEW
     deleteBtn: { backgroundColor: 'transparent', color: '#EB5757', border: '1px solid rgba(235, 87, 87, 0.4)', borderRadius: '4px', cursor: 'pointer', padding: '4px 8px', fontSize: '12px', transition: 'all 0.2s' },
     pill: (type) => {
       const base = { padding: '2px 6px', borderRadius: '3px', fontSize: '13px', display: 'inline-block' };
@@ -153,7 +191,11 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
     <motion.div style={styles.container} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
       <div style={styles.header}>
         <h1 style={styles.title}>📗 TRADES DB</h1>
-        <button style={styles.addButton} onClick={() => setShowForm(!showForm)}>
+        <button style={styles.addButton} onClick={() => {
+          setEditingTradeId(null);
+          setFormData(defaultFormState);
+          setShowForm(!showForm);
+        }}>
           {showForm ? 'Close Form' : '➕ Add Manual Trade'}
         </button>
       </div>
@@ -167,6 +209,13 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
             style={styles.formContainer}
             onSubmit={handleSubmit}
           >
+            {/* 🟢 NEW: Shows "Editing Trade" badge if in edit mode */}
+            {editingTradeId && (
+              <div style={{ color: '#2D9CDB', fontWeight: 'bold', marginBottom: '15px', borderBottom: '1px solid rgba(45, 156, 219, 0.2)', paddingBottom: '10px' }}>
+                ✏️ Editing Trade Record
+              </div>
+            )}
+            
             <div style={styles.formGrid}>
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Symbol / Pair</label>
@@ -191,6 +240,7 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
                   <option>SHORT</option>
                 </select>
               </div>
+              
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Entry Price</label>
                 <input style={styles.input} type="number" step="any" name="entryPrice" placeholder="e.g. 45000.5" value={formData.entryPrice} onChange={handleChange} />
@@ -203,15 +253,17 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
                 <label style={styles.label}>Exit Price</label>
                 <input style={styles.input} type="number" step="any" name="exitPrice" placeholder="e.g. 45100.0" value={formData.exitPrice} onChange={handleChange} />
               </div>
+
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Est. R-Multiple</label>
                 <div style={{ ...styles.input, color: calculatedRR >= 0 ? '#219653' : '#EB5757', fontWeight: 'bold' }}>
                   {calculatedRR}R
                 </div>
               </div>
+
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Profit / Loss ($)</label>
-                <input style={styles.input} type="number" name="profitLoss" value={formData.profitLoss} onChange={handleChange} required />
+                <input style={styles.input} type="number" step="any" name="profitLoss" value={formData.profitLoss} onChange={handleChange} required />
               </div>
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Playbook Model</label>
@@ -224,6 +276,7 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
                 <label style={styles.label}>Entry Window</label>
                 <input style={styles.input} type="text" name="entryWindow" placeholder="e.g., 9-10am" value={formData.entryWindow} onChange={handleChange} />
               </div>
+              
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Positive Tags</label>
                 <input style={styles.input} type="text" name="positiveTags" placeholder="patient, good entry..." value={formData.positiveTags} onChange={handleChange} />
@@ -245,7 +298,9 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
                 <label style={styles.label}>Hit Breakeven (BE)</label>
               </div>
             </div>
-            <button type="submit" style={styles.submitButton}>Save Trade to Database</button>
+            <button type="submit" style={styles.submitButton}>
+              {editingTradeId ? 'Update Trade in Database' : 'Save Trade to Database'}
+            </button>
           </motion.form>
         )}
       </AnimatePresence>
@@ -309,7 +364,12 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
                   <td style={styles.td}><span style={styles.pill(trade.account || 'Account1')}>{trade.account || '-'}</span></td>
                   <td style={{...styles.td, color: '#F2C94C', letterSpacing: '2px'}}>{renderStars(trade.rating)}</td>
                   <td style={styles.td}><input type="checkbox" checked={trade.win || trade.profitLoss > 0} readOnly style={styles.checkbox}/></td>
-                  <td style={styles.td}><button style={styles.deleteBtn} onClick={() => onDeleteTrade(trade.id)}>Delete</button></td>
+                  
+                  {/* 🟢 NEW: Edit & Delete Buttons Side-by-Side */}
+                  <td style={styles.td}>
+                    <button style={styles.editBtn} onClick={() => handleEditClick(trade)}>Edit</button>
+                    <button style={styles.deleteBtn} onClick={() => onDeleteTrade(trade.id)}>Delete</button>
+                  </td>
                 </tr>
               ))
             )}
