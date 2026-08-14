@@ -44,7 +44,7 @@ pool.query(`
 `).then(() => console.log('✅ user_id column ready in trades'))
   .catch(() => console.log('ℹ️ user_id column already exists in trades'));
 
-// 🟢 NEW: Auto-Create Missed Trades Table with user_id attached
+// Auto-Create Missed Trades Table with user_id attached
 pool.query(`
   CREATE TABLE IF NOT EXISTS missed_trades (
     id INT PRIMARY KEY AUTO_INCREMENT,
@@ -60,6 +60,33 @@ pool.query(`
   )
 `).then(() => console.log('✅ Missed Trades table ready'))
   .catch(err => console.error('❌ Missed Trades table error:', err.message));
+
+// 🟢 NEW: Playbooks Table
+pool.query(`
+  CREATE TABLE IF NOT EXISTS playbooks (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    timeframe VARCHAR(20) DEFAULT '15m',
+    description TEXT,
+    rules TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )
+`).then(() => console.log('✅ Playbooks table ready'))
+  .catch(err => console.error('❌ Playbooks table error:', err.message));
+
+// 🟢 NEW: Add Advanced Metrics Columns to Trades
+async function updateTradesTable() {
+  try {
+    await pool.query("ALTER TABLE trades ADD COLUMN IF NOT EXISTS stop_loss DECIMAL(15,4) DEFAULT 0");
+    await pool.query("ALTER TABLE trades ADD COLUMN IF NOT EXISTS risk_reward DECIMAL(10,2) DEFAULT 0");
+    await pool.query("ALTER TABLE trades ADD COLUMN IF NOT EXISTS playbook_id INT DEFAULT NULL");
+    console.log('✅ Trades table advanced columns ready');
+  } catch (e) {
+    console.log('ℹ️ Trades table columns check complete');
+  }
+}
+updateTradesTable();
 
 
 // JWT MIDDLEWARE
@@ -80,7 +107,9 @@ const mapDBToReact = (row) => ({
   symbol: row.symbol,
   entryPrice: parseFloat(row.entry_price) || 0,
   exitPrice: parseFloat(row.exit_price) || 0,
+  stopLoss: parseFloat(row.stop_loss) || 0, // 🟢 NEW
   profitLoss: parseFloat(row.profit_loss) || 0,
+  riskReward: parseFloat(row.risk_reward) || 0, // 🟢 NEW
   entryTime: row.entry_time,
   session: row.session || '',
   direction: row.direction || '',
@@ -90,6 +119,7 @@ const mapDBToReact = (row) => ({
   wentRight: row.went_right || '',
   entryWindow: row.entry_window || '',
   model: row.model || '',
+  playbookId: row.playbook_id || null, // 🟢 NEW
   positiveTags: row.positive_tags ? row.positive_tags.split(',').filter(t => t) : [],
   negativeTags: row.negative_tags ? row.negative_tags.split(',').filter(t => t) : [],
   account: row.account || '',
@@ -97,7 +127,7 @@ const mapDBToReact = (row) => ({
   win: (parseFloat(row.profit_loss) || 0) > 0
 });
 
-// 🟢 NEW: Map Missed Trades DB Row to React Format
+// Map Missed Trades DB Row to React Format
 const mapMissedDBToReact = (row) => ({
   id: row.id,
   symbol: row.symbol,
@@ -159,6 +189,42 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // ==========================================
+// 🟢 NEW: PLAYBOOK ROUTES
+// ==========================================
+app.get('/api/playbooks', verifyToken, async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM playbooks WHERE user_id = ? ORDER BY created_at DESC', [req.user.id]);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/playbooks', verifyToken, async (req, res) => {
+  const { name, timeframe, description, rules } = req.body;
+  if (!name) return res.status(400).json({ error: 'Playbook name required' });
+  try {
+    const [result] = await pool.query(
+      'INSERT INTO playbooks (user_id, name, timeframe, description, rules) VALUES (?, ?, ?, ?, ?)',
+      [req.user.id, name, timeframe || '15m', description || '', rules || '']
+    );
+    const [rows] = await pool.query('SELECT * FROM playbooks WHERE id = ?', [result.insertId]);
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/playbooks/:id', verifyToken, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM playbooks WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    res.json({ message: 'Playbook deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
 // TRADES ROUTES (ALL PROTECTED)
 // ==========================================
 
@@ -178,7 +244,7 @@ app.get('/api/trades', verifyToken, async (req, res) => {
 // POST NEW TRADE
 app.post('/api/trades', verifyToken, async (req, res) => {
   const {
-    symbol, entryPrice, exitPrice, profitLoss,
+    symbol, entryPrice, exitPrice, stopLoss, profitLoss, riskReward, playbookId, // 🟢 NEW
     entryTime, session, direction, followedPlan,
     rating, mistakes, wentRight,
     entryWindow, model, positiveTags, negativeTags, account, be
@@ -197,15 +263,18 @@ app.post('/api/trades', verifyToken, async (req, res) => {
   try {
     const [result] = await pool.query(
       `INSERT INTO trades
-      (symbol, entry_price, exit_price, profit_loss, entry_time, session,
+      (symbol, entry_price, exit_price, stop_loss, profit_loss, risk_reward, playbook_id, entry_time, session,
        direction, followed_plan, rating, mistakes, went_right,
        entry_window, model, positive_tags, negative_tags, account, be, user_id)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         symbol || 'UNKNOWN',
         entryPrice || 0,
         exitPrice || 0,
+        stopLoss || 0, // 🟢 NEW
         profitLoss || 0,
+        riskReward || 0, // 🟢 NEW
+        playbookId || null, // 🟢 NEW
         mysqlEntryTime,
         session || '',
         direction || '',
@@ -248,7 +317,7 @@ app.delete('/api/trades/:id', verifyToken, async (req, res) => {
 // UPDATE TRADE
 app.put('/api/trades/:id', verifyToken, async (req, res) => {
   const {
-    symbol, entryPrice, exitPrice, profitLoss,
+    symbol, entryPrice, exitPrice, stopLoss, profitLoss, riskReward, playbookId, // 🟢 NEW
     entryTime, session, direction, followedPlan,
     rating, mistakes, wentRight,
     entryWindow, model, positiveTags, negativeTags, account, be
@@ -264,14 +333,14 @@ app.put('/api/trades/:id', verifyToken, async (req, res) => {
   try {
     await pool.query(
       `UPDATE trades SET
-        symbol=?, entry_price=?, exit_price=?, profit_loss=?,
+        symbol=?, entry_price=?, exit_price=?, stop_loss=?, profit_loss=?, risk_reward=?, playbook_id=?,
         entry_time=?, session=?, direction=?, followed_plan=?,
         rating=?, mistakes=?, went_right=?,
         entry_window=?, model=?, positive_tags=?,
         negative_tags=?, account=?, be=?
       WHERE id=? AND user_id=?`,
       [
-        symbol, entryPrice || 0, exitPrice || 0, profitLoss || 0,
+        symbol, entryPrice || 0, exitPrice || 0, stopLoss || 0, profitLoss || 0, riskReward || 0, playbookId || null,
         mysqlEntryTime, session || '', direction || '',
         followedPlan ? 1 : 0, rating || 5,
         mistakes || '', wentRight || '',
@@ -291,7 +360,7 @@ app.put('/api/trades/:id', verifyToken, async (req, res) => {
 });
 
 // ==========================================
-// 🟢 NEW: MISSED TRADES ROUTES (PROTECTED)
+// MISSED TRADES ROUTES (PROTECTED)
 // ==========================================
 
 // GET ALL MISSED TRADES
