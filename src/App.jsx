@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar, AreaChart, Area, ResponsiveContainer, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
-import { motion, useMotionValue, useSpring, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import ReviewPage from './pages/ReviewPage';
 import MilestonesPage from './pages/MilestonesPage';
 import Analytics from './pages/Analytics.jsx';
@@ -13,36 +13,13 @@ import './App.css';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-// Animated number counter
-const AnimatedNumber = ({ value, prefix = '', suffix = '', decimals = 2 }) => {
-  const [display, setDisplay] = useState(0);
-  useEffect(() => {
-    let start = 0;
-    const end = parseFloat(value) || 0;
-    if (start === end) { setDisplay(end); return; }
-    const duration = 1000;
-    const step = (end - start) / (duration / 16);
-    let current = start;
-    const timer = setInterval(() => {
-      current += step;
-      if ((step > 0 && current >= end) || (step < 0 && current <= end)) {
-        setDisplay(end);
-        clearInterval(timer);
-      } else {
-        setDisplay(parseFloat(current.toFixed(decimals)));
-      }
-    }, 16);
-    return () => clearInterval(timer);
-  }, [value]);
-  return <span>{prefix}{display.toFixed(decimals)}{suffix}</span>;
-};
-
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [trades, setTrades] = useState([]);
   const [missedTrades, setMissedTrades] = useState([]);
   const [playbooks, setPlaybooks] = useState([]); // 🟢 NEW
   const [user, setUser] = useState(getUser());
+
   const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
 
@@ -52,74 +29,89 @@ export default function App() {
     return [];
   };
 
-  const formatTradeData = (data) => ({
-    id: data.id,
-    symbol: data.symbol,
-    entryPrice: parseFloat(data.entryPrice !== undefined ? data.entryPrice : data.entry_price) || 0,
-    exitPrice: parseFloat(data.exitPrice !== undefined ? data.exitPrice : data.exit_price) || 0,
-    stopLoss: parseFloat(data.stopLoss !== undefined ? data.stopLoss : data.stop_loss) || 0, // 🟢 NEW
-    profitLoss: parseFloat(data.profitLoss !== undefined ? data.profitLoss : data.profit_loss) || 0,
-    riskReward: parseFloat(data.riskReward !== undefined ? data.riskReward : data.risk_reward) || 0, // 🟢 NEW
-    entryTime: data.entryTime || data.entry_time,
-    session: data.session || '',
-    direction: data.direction || '',
-    followedPlan: data.followedPlan !== undefined ? data.followedPlan : data.followed_plan,
-    rating: data.rating || 5,
-    mistakes: data.mistakes || '',
-    wentRight: data.wentRight || data.went_right || '',
-    entryWindow: data.entryWindow || data.entry_window || '',
-    model: data.model || '',
-    playbookId: data.playbookId || data.playbook_id || null, // 🟢 NEW
-    chartLink: data.chartLink || data.chart_link || '', // 🟢 NEW
-    positiveTags: parseTags(data.positiveTags || data.positive_tags),
-    negativeTags: parseTags(data.negativeTags || data.negative_tags),
-    account: data.account || '',
-    be: data.be || false,
-    win: (parseFloat(data.profitLoss !== undefined ? data.profitLoss : data.profit_loss) || 0) > 0
-  });
+  const formatTradeData = (data) => {
+    return {
+      id: data.id,
+      symbol: data.symbol,
+      entryPrice: parseFloat(data.entryPrice !== undefined ? data.entryPrice : data.entry_price) || 0,
+      exitPrice: parseFloat(data.exitPrice !== undefined ? data.exitPrice : data.exit_price) || 0,
+      stopLoss: parseFloat(data.stopLoss !== undefined ? data.stopLoss : data.stop_loss) || 0, // 🟢 NEW
+      profitLoss: parseFloat(data.profitLoss !== undefined ? data.profitLoss : data.profit_loss) || 0,
+      riskReward: parseFloat(data.riskReward !== undefined ? data.riskReward : data.risk_reward) || 0, // 🟢 NEW
+      entryTime: data.entryTime || data.entry_time,
+      session: data.session || '',
+      direction: data.direction || '',
+      followedPlan: data.followedPlan !== undefined ? data.followedPlan : data.followed_plan,
+      rating: data.rating || 5,
+      mistakes: data.mistakes || '',
+      wentRight: data.wentRight || data.went_right || '',
+      entryWindow: data.entryWindow || data.entry_window || '',
+      model: data.model || '',
+      playbookId: data.playbookId || data.playbook_id || null, // 🟢 NEW
+      positiveTags: parseTags(data.positiveTags || data.positive_tags),
+      negativeTags: parseTags(data.negativeTags || data.negative_tags),
+      account: data.account || '',
+      be: data.be || false,
+      win: (parseFloat(data.profitLoss !== undefined ? data.profitLoss : data.profit_loss) || 0) > 0
+    };
+  };
 
-  const formatMissedTradeData = (data) => ({
-    id: data.id,
-    symbol: data.symbol,
-    missedEntryPrice: parseFloat(data.missedEntryPrice !== undefined ? data.missedEntryPrice : data.missed_entry_price) || 0,
-    missedExitPrice: parseFloat(data.missedExitPrice !== undefined ? data.missedExitPrice : data.missed_exit_price) || 0,
-    predictedPnl: parseFloat(data.predictedPnl !== undefined ? data.predictedPnl : data.predicted_pnl) || 0,
-    date: data.date || data.entry_time,
-    reason: data.reason || ''
-  });
+  const formatMissedTradeData = (data) => {
+    return {
+      id: data.id,
+      symbol: data.symbol,
+      missedEntryPrice: parseFloat(data.missedEntryPrice !== undefined ? data.missedEntryPrice : data.missed_entry_price) || 0,
+      missedExitPrice: parseFloat(data.missedExitPrice !== undefined ? data.missedExitPrice : data.missed_exit_price) || 0,
+      predictedPnl: parseFloat(data.predictedPnl !== undefined ? data.predictedPnl : data.predicted_pnl) || 0,
+      date: data.date || data.entry_time,
+      reason: data.reason || ''
+    };
+  };
 
   useEffect(() => {
     if (!user) return;
+    
+    // Fetch Normal Trades
     fetch(`${API}/trades`, { headers: { 'Authorization': `Bearer ${getToken()}` } })
       .then(res => res.json())
       .then(data => { if (Array.isArray(data)) setTrades(data.map(formatTradeData)); })
       .catch(err => console.error('Failed to fetch trades:', err));
+
+    // Fetch Missed Trades
     fetch(`${API}/missed-trades`, { headers: { 'Authorization': `Bearer ${getToken()}` } })
       .then(res => res.json())
       .then(data => { if (Array.isArray(data)) setMissedTrades(data.map(formatMissedTradeData)); })
       .catch(err => console.error('Failed to fetch missed trades:', err));
+
     // 🟢 NEW: Fetch Playbooks
     fetch(`${API}/playbooks`, { headers: { 'Authorization': `Bearer ${getToken()}` } })
       .then(res => res.json())
       .then(data => { if (Array.isArray(data)) setPlaybooks(data); })
       .catch(err => console.error('Failed to fetch playbooks:', err));
+
   }, [user]);
 
   const handleAddTrade = (newTrade) => {
-    const safeTrade = { entryPrice: 0, exitPrice: 0, ...newTrade };
+    const safeTrade = { entryPrice: 0, exitPrice: 0, stopLoss: 0, riskReward: 0, ...newTrade };
     fetch(`${API}/trades`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
       body: JSON.stringify(safeTrade)
     })
-      .then(res => { if (!res.ok) throw new Error(`HTTP Error: ${res.status}`); return res.json(); })
-      .then(saved => { if (!saved || !saved.symbol) return; setTrades((prev) => [formatTradeData(saved), ...prev]); })
-      .catch(() => alert("⚠️ Connection Error: Could not reach the database backend."));
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+        return res.json();
+      })
+      .then(saved => {
+        if (!saved || !saved.symbol) return;
+        setTrades((prevTrades) => [formatTradeData(saved), ...prevTrades]);
+      })
+      .catch(err => alert("⚠️ Connection Error: Could not reach the database backend."));
   };
 
   const handleDeleteTrade = (idToDelete) => {
     fetch(`${API}/trades/${idToDelete}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${getToken()}` } })
-      .then(() => setTrades((prev) => prev.filter(trade => trade.id !== idToDelete)))
+      .then(() => setTrades((prevTrades) => prevTrades.filter(trade => trade.id !== idToDelete)))
       .catch(err => console.error('Failed to delete trade:', err));
   };
 
@@ -133,7 +125,7 @@ export default function App() {
       .then(saved => {
         if (!saved || !saved.symbol) return;
         const mapped = formatTradeData(saved);
-        setTrades((prev) => prev.map(trade => trade.id === mapped.id ? mapped : trade));
+        setTrades((prevTrades) => prevTrades.map(trade => trade.id === mapped.id ? mapped : trade));
       })
       .catch(err => console.error('Failed to update trade:', err));
   };
@@ -144,9 +136,15 @@ export default function App() {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
       body: JSON.stringify(newMissedTrade)
     })
-      .then(res => { if (!res.ok) throw new Error(`HTTP Error: ${res.status}`); return res.json(); })
-      .then(saved => { if (!saved || !saved.symbol) return; setMissedTrades((prev) => [formatMissedTradeData(saved), ...prev]); })
-      .catch(() => alert("⚠️ Connection Error: Could not save missed trade."));
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+        return res.json();
+      })
+      .then(saved => {
+        if (!saved || !saved.symbol) return;
+        setMissedTrades((prev) => [formatMissedTradeData(saved), ...prev]);
+      })
+      .catch(err => alert("⚠️ Connection Error: Could not save missed trade."));
   };
 
   const handleDeleteMissedTrade = (idToDelete) => {
@@ -155,23 +153,32 @@ export default function App() {
       .catch(err => console.error('Failed to delete missed trade:', err));
   };
 
-  // 🟢 NEW: Playbook handlers
+  // 🟢 NEW: Playbook Handlers
   const handleAddPlaybook = (newPb) => {
     fetch(`${API}/playbooks`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` }, body: JSON.stringify(newPb) })
       .then(res => res.json()).then(saved => setPlaybooks(prev => [saved, ...prev]));
   };
+
   const handleDeletePlaybook = (id) => {
     fetch(`${API}/playbooks/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${getToken()}` } })
       .then(() => setPlaybooks(prev => prev.filter(p => p.id !== id)));
   };
 
-  const handleLogin = (userData) => setUser(userData);
-  const handleLogout = () => { logout(); setUser(null); setTrades([]); setMissedTrades([]); setPlaybooks([]); };
+  const handleLogin = (userData) => { setUser(userData); };
+
+  const handleLogout = () => {
+    logout();
+    setUser(null);
+    setTrades([]);
+    setMissedTrades([]);
+    setPlaybooks([]);
+  };
 
   const handlePrevMonth = () => {
     if (calendarMonth === 0) { setCalendarMonth(11); setCalendarYear(y => y - 1); }
     else setCalendarMonth(m => m - 1);
   };
+
   const handleNextMonth = () => {
     if (calendarMonth === 11) { setCalendarMonth(0); setCalendarYear(y => y + 1); }
     else setCalendarMonth(m => m + 1);
@@ -179,7 +186,7 @@ export default function App() {
 
   const tabs = [
     { label: 'HOME', value: 'home' },
-    { label: 'PLAYBOOK', value: 'playbook' }, // 🟢 NEW TAB
+    { label: 'PLAYBOOK', value: 'playbook' }, // 🟢 NEW
     { label: 'ANALYTICS', value: 'analytics' },
     { label: 'REVIEW', value: 'review' },
     { label: 'TRADES DB', value: 'tradesDb' },
@@ -190,7 +197,7 @@ export default function App() {
   const calculateMetrics = (trades) => {
     const total = trades.length;
     if (total === 0) {
-      return { winRate: 0, totalPnL: 0, returns: 0, profitFactor: 0, maxDrawdown: 0, avgWin: 0, avgLoss: 0, expectancy: 0 };
+      return { winRate: 0, totalPnL: 0, returns: 0, profitFactor: 0, maxDrawdown: 0, avgWin: 0, avgLoss: 0 };
     }
     const winningTrades = trades.filter(t => t.profitLoss > 0);
     const losingTrades = trades.filter(t => t.profitLoss < 0);
@@ -198,7 +205,6 @@ export default function App() {
     const losing = losingTrades.length;
     const winRate = (winning / total) * 100;
     const totalPnL = trades.reduce((sum, t) => sum + t.profitLoss, 0);
-    const expectancy = totalPnL / total; // 🟢 NEW
     const returns = (totalPnL / 10000) * 100;
     const grossProfit = winningTrades.reduce((sum, t) => sum + t.profitLoss, 0);
     const grossLoss = Math.abs(losingTrades.reduce((sum, t) => sum + t.profitLoss, 0));
@@ -221,7 +227,6 @@ export default function App() {
       maxDrawdown: parseFloat(maxDrawdown.toFixed(2)),
       avgWin: parseFloat(avgWin.toFixed(2)),
       avgLoss: parseFloat(avgLoss.toFixed(2)),
-      expectancy: parseFloat(expectancy.toFixed(2)) // 🟢 NEW
     };
   };
 
@@ -340,9 +345,14 @@ export default function App() {
           <button
             onClick={handleLogout}
             style={{
-              background: 'transparent', border: '1px solid #EB5757', color: '#EB5757',
-              padding: '6px 12px', borderRadius: '4px', cursor: 'pointer',
-              fontSize: '0.9rem', transition: 'all 0.2s'
+              background: 'transparent',
+              border: '1px solid #EB5757',
+              color: '#EB5757',
+              padding: '6px 12px',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '0.9rem',
+              transition: 'all 0.2s'
             }}
           >
             Logout
@@ -416,8 +426,8 @@ export default function App() {
                   <div style={{ color: metrics.totalPnL >= 0 ? '#00FF88' : '#FF3333', fontSize: '2.5rem', fontWeight: 'bold' }}>${metrics.totalPnL}</div>
                 </motion.div>
                 <motion.div whileHover={{ scale: 1.08, boxShadow: '0 0 25px rgba(0, 255, 136, 0.6)' }} style={{ background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '12px', padding: '20px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.3s' }}>
-                  <div style={{ color: '#B0B0B0', fontSize: '0.9rem', marginBottom: '10px' }}>Expectancy</div>
-                  <div style={{ color: metrics.expectancy >= 0 ? '#00FF88' : '#FF3333', fontSize: '2.5rem', fontWeight: 'bold' }}>${metrics.expectancy}</div>
+                  <div style={{ color: '#B0B0B0', fontSize: '0.9rem', marginBottom: '10px' }}>Returns</div>
+                  <div style={{ color: metrics.returns >= 0 ? '#00FF88' : '#FF3333', fontSize: '2.5rem', fontWeight: 'bold' }}>{metrics.returns}%</div>
                 </motion.div>
                 <motion.div whileHover={{ scale: 1.08, boxShadow: '0 0 25px rgba(0, 255, 136, 0.6)' }} style={{ background: 'rgba(26, 26, 26, 0.8)', border: '1px solid rgba(0, 255, 136, 0.3)', borderRadius: '12px', padding: '20px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.3s' }}>
                   <div style={{ color: '#B0B0B0', fontSize: '0.9rem', marginBottom: '10px' }}>Profit Factor</div>
@@ -531,7 +541,7 @@ export default function App() {
           </>
         ) : (
           <div style={{ flex: 1, width: '100%', maxWidth: '100%' }}>
-            {activeTab === 'playbook' ? ( // 🟢 NEW TAB
+            {activeTab === 'playbook' ? (
               <Playbook playbooks={playbooks} trades={trades} onAddPlaybook={handleAddPlaybook} onDeletePlaybook={handleDeletePlaybook} />
             ) : activeTab === 'analytics' ? (
               <Analytics trades={trades} />
@@ -540,9 +550,18 @@ export default function App() {
             ) : activeTab === 'milestones' ? (
               <MilestonesPage trades={trades} />
             ) : activeTab === 'missedTradesDb' ? (
-              <MissedTradeDB missedTrades={missedTrades} onAddMissedTrade={handleAddMissedTrade} onDeleteMissedTrade={handleDeleteMissedTrade} />
+              <MissedTradeDB 
+                missedTrades={missedTrades} 
+                onAddMissedTrade={handleAddMissedTrade} 
+                onDeleteMissedTrade={handleDeleteMissedTrade} 
+              />
             ) : activeTab === 'tradesDb' ? (
-              <TradesDB trades={trades} playbooks={playbooks} onAddTrade={handleAddTrade} onDeleteTrade={handleDeleteTrade} />
+              <TradesDB 
+                trades={trades} 
+                playbooks={playbooks} 
+                onAddTrade={handleAddTrade} 
+                onDeleteTrade={handleDeleteTrade} 
+              />
             ) : (
               <div className="tab-content">Content for {activeTab}</div>
             )}
