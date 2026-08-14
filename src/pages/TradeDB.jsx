@@ -1,41 +1,30 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
+// We now accept 'trades', 'onAddTrade', and 'onDeleteTrade' directly from App.jsx
+const TradesDB = ({ trades, onAddTrade, onDeleteTrade }) => {
   
+  // Form State
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     symbol: 'EURUSD',
     date: new Date().toISOString().split('T')[0],
     session: 'New York',
     direction: 'LONG',
-    entryPrice: '',
-    exitPrice: '',
-    stopLoss: '', // 🟢 NEW
-    playbookId: '', // 🟢 NEW
+    entryPrice: '',  // 🟢 NEW
+    exitPrice: '',   // 🟢 NEW
     profitLoss: 0,
     followedPlan: true,
     be: false,
     entryWindow: '9-10am',
+    model: 'SMC - Liq Sweep',
     positiveTags: '',
     negativeTags: '',
     account: 'Account1',
     rating: 5
   });
 
-  // 🟢 NEW: Auto-calculate R-Multiple
-  const calculatedRR = useMemo(() => {
-    const entry = parseFloat(formData.entryPrice);
-    const exit = parseFloat(formData.exitPrice);
-    const sl = parseFloat(formData.stopLoss);
-
-    if (!entry || !exit || !sl || entry === sl) return 0;
-
-    const risk = Math.abs(entry - sl);
-    const reward = formData.direction === 'LONG' ? (exit - entry) : (entry - exit);
-    return parseFloat((reward / risk).toFixed(2));
-  }, [formData.entryPrice, formData.exitPrice, formData.stopLoss, formData.direction]);
-
+  // Handle Form Input Changes
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({
@@ -44,23 +33,20 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
     }));
   };
 
+  // Submit New Trade to App.jsx
   const handleSubmit = (e) => {
     e.preventDefault();
     const dateObj = new Date(formData.date);
     
-    // Resolve playbook model name
-    const selectedPb = playbooks.find(p => p.id === parseInt(formData.playbookId));
-    const modelName = selectedPb ? selectedPb.name : 'Manual Setup';
-
     const newTrade = {
       id: Date.now(), 
       symbol: formData.symbol.toUpperCase(),
-      entryPrice: parseFloat(formData.entryPrice) || 0,
-      exitPrice: parseFloat(formData.exitPrice) || 0,
-      stopLoss: parseFloat(formData.stopLoss) || 0, // 🟢 NEW
+      entryPrice: parseFloat(formData.entryPrice) || 0, // 🟢 NEW: Safely handles blanks
+      exitPrice: parseFloat(formData.exitPrice) || 0,   // 🟢 NEW: Safely handles blanks
       profitLoss: parseFloat(formData.profitLoss),
-      riskReward: calculatedRR, // 🟢 NEW
       entryTime: dateObj.toISOString().slice(0, 19).replace('T', ' '),
+      
+      // Additional Notion-style display data
       date: formData.date,
       formattedDate: dateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
       session: formData.session,
@@ -68,8 +54,7 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
       followedPlan: formData.followedPlan,
       be: formData.be,
       entryWindow: formData.entryWindow,
-      model: modelName, // 🟢 NEW
-      playbookId: formData.playbookId ? parseInt(formData.playbookId) : null, // 🟢 NEW
+      model: formData.model,
       positiveTags: formData.positiveTags.split(',').map(t => t.trim()).filter(t => t),
       negativeTags: formData.negativeTags.split(',').map(t => t.trim()).filter(t => t),
       account: formData.account,
@@ -82,26 +67,27 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
 
     onAddTrade(newTrade); 
     setShowForm(false); 
-    setFormData(prev => ({ ...prev, profitLoss: 0, entryPrice: '', exitPrice: '', stopLoss: '', positiveTags: '', negativeTags: '' }));
+    // 🟢 NEW: Reset the price fields along with the others
+    setFormData(prev => ({ ...prev, profitLoss: 0, entryPrice: '', exitPrice: '', positiveTags: '', negativeTags: '' }));
   };
 
+  // Calculate Footer Summary Metrics
   const summary = useMemo(() => {
-    if (!trades || trades.length === 0) return { totalPnL: 0, planPercent: 0, avgRating: 0, winRate: 0, avgRR: 0 };
+    if (!trades || trades.length === 0) return { totalPnL: 0, planPercent: 0, avgRating: 0, winRate: 0 };
     const totalPnL = trades.reduce((sum, t) => sum + t.profitLoss, 0);
     const planFollowed = trades.filter(t => t.followedPlan).length;
     const totalWins = trades.filter(t => (t.win || t.profitLoss > 0)).length;
     const totalRating = trades.reduce((sum, t) => sum + (t.rating || 5), 0);
-    const totalRR = trades.reduce((sum, t) => sum + (t.riskReward || 0), 0); // 🟢 NEW
 
     return {
       totalPnL: totalPnL.toFixed(2),
       planPercent: ((planFollowed / trades.length) * 100).toFixed(0),
       avgRating: (totalRating / trades.length).toFixed(2),
-      winRate: ((totalWins / trades.length) * 100).toFixed(2),
-      avgRR: (totalRR / trades.length).toFixed(2) // 🟢 NEW
+      winRate: ((totalWins / trades.length) * 100).toFixed(2)
     };
   }, [trades]);
 
+  // Styles
   const styles = {
     container: { backgroundColor: '#191919', color: '#E0E0E0', minHeight: '100vh', padding: '20px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif' },
     header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
@@ -115,7 +101,7 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
     checkboxGroup: { display: 'flex', alignItems: 'center', gap: '8px', height: '100%', paddingTop: '15px' },
     submitButton: { backgroundColor: '#219653', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', marginTop: '20px', width: '100%' },
     tableWrapper: { overflowX: 'auto', paddingBottom: '20px' },
-    table: { width: '100%', minWidth: '1700px', borderCollapse: 'collapse', fontSize: '14px' }, 
+    table: { width: '100%', minWidth: '1700px', borderCollapse: 'collapse', fontSize: '14px' }, // Widened table slightly for new columns
     th: { textAlign: 'left', padding: '12px 16px', color: '#9B9A97', fontWeight: '500', borderBottom: '1px solid rgba(255,255,255,0.1)', whiteSpace: 'nowrap' },
     td: { padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', whiteSpace: 'nowrap' },
     deleteBtn: { backgroundColor: 'transparent', color: '#EB5757', border: '1px solid rgba(235, 87, 87, 0.4)', borderRadius: '4px', cursor: 'pointer', padding: '4px 8px', fontSize: '12px', transition: 'all 0.2s' },
@@ -186,13 +172,10 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
                 </select>
               </div>
               
+              {/* 🟢 NEW INPUT BOXES */}
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Entry Price</label>
                 <input style={styles.input} type="number" step="any" name="entryPrice" placeholder="e.g. 45000.5" value={formData.entryPrice} onChange={handleChange} />
-              </div>
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Stop Loss</label>
-                <input style={styles.input} type="number" step="any" name="stopLoss" placeholder="e.g. 44950.0" value={formData.stopLoss} onChange={handleChange} />
               </div>
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Exit Price</label>
@@ -200,36 +183,23 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
               </div>
 
               <div style={styles.inputGroup}>
-                <label style={styles.label}>Est. R-Multiple</label>
-                <div style={{ ...styles.input, color: calculatedRR >= 0 ? '#219653' : '#EB5757', fontWeight: 'bold' }}>
-                  {calculatedRR}R
-                </div>
-              </div>
-
-              <div style={styles.inputGroup}>
                 <label style={styles.label}>Profit / Loss ($)</label>
                 <input style={styles.input} type="number" name="profitLoss" value={formData.profitLoss} onChange={handleChange} required />
               </div>
-
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Playbook Model</label>
-                <select style={styles.input} name="playbookId" value={formData.playbookId} onChange={handleChange}>
-                  <option value="">-- Custom / Manual --</option>
-                  {playbooks.map(pb => <option key={pb.id} value={pb.id}>{pb.name}</option>)}
-                </select>
-              </div>
-
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Entry Window</label>
                 <input style={styles.input} type="text" name="entryWindow" placeholder="e.g., 9-10am" value={formData.entryWindow} onChange={handleChange} />
               </div>
-              
               <div style={styles.inputGroup}>
-                <label style={styles.label}>Positive Tags</label>
+                <label style={styles.label}>Model Strategy</label>
+                <input style={styles.input} type="text" name="model" value={formData.model} onChange={handleChange} />
+              </div>
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>Positive Tags (comma separated)</label>
                 <input style={styles.input} type="text" name="positiveTags" placeholder="patient, good entry..." value={formData.positiveTags} onChange={handleChange} />
               </div>
               <div style={styles.inputGroup}>
-                <label style={styles.label}>Negative Tags</label>
+                <label style={styles.label}>Negative Tags (comma separated)</label>
                 <input style={styles.input} type="text" name="negativeTags" placeholder="fomo, early exit..." value={formData.negativeTags} onChange={handleChange} />
               </div>
               <div style={styles.inputGroup}>
@@ -259,19 +229,18 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
               <th style={styles.th}>📈 Pairs</th>
               <th style={styles.th}>⏳ Session</th>
               <th style={styles.th}>↕️ Direction</th>
-              <th style={styles.th}>🎯 Entry</th>
-              <th style={styles.th}>🛡️ SL</th>
-              <th style={styles.th}>🏁 Exit</th>
-              <th style={styles.th}>⚖️ R:R</th>
-              <th style={styles.th}>💵 P/L</th>
-              <th style={styles.th}>☑️ Plan</th>
+              {/* 🟢 NEW TABLE HEADERS */}
+              <th style={styles.th}>🎯 Entry Price</th>
+              <th style={styles.th}>🏁 Exit Price</th>
+              <th style={styles.th}>💵 Profit/Loss</th>
+              <th style={styles.th}>☑️ Followed Plan</th>
               <th style={styles.th}>☑️ BE</th>
-              <th style={styles.th}>🕒 Window</th>
+              <th style={styles.th}>🕒 Entry Window</th>
               <th style={styles.th}>🎯 Model</th>
-              <th style={styles.th}>➕ Pos tags</th>
-              <th style={styles.th}>➖ Neg tags</th>
-              <th style={styles.th}>💼 Acc</th>
-              <th style={styles.th}>⭐ Rate</th>
+              <th style={styles.th}>➕ Positive tags</th>
+              <th style={styles.th}>➖ Negative tags</th>
+              <th style={styles.th}>💼 Account</th>
+              <th style={styles.th}>⭐ Rating</th>
               <th style={styles.th}>🏆 WIN</th>
               <th style={styles.th}>⚙️ Action</th>
             </tr>
@@ -279,7 +248,7 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
           <tbody>
             {!trades || trades.length === 0 ? (
               <tr>
-                <td colSpan={20} style={styles.emptyState}>
+                <td colSpan={18} style={styles.emptyState}>
                   No trades logged yet. Click "Add Manual Trade" to start journaling!
                 </td>
               </tr>
@@ -292,13 +261,9 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
                   <td style={styles.td}><span style={styles.pill(trade.session || 'New York')}>{trade.session || 'N/A'}</span></td>
                   <td style={styles.td}><span style={styles.pill(trade.direction || (trade.profitLoss > 0 ? 'LONG' : 'SHORT'))}>{trade.direction || '-'}</span></td>
                   
+                  {/* 🟢 NEW TABLE DATA CELLS */}
                   <td style={styles.td}>{trade.entryPrice === 0 ? '-' : trade.entryPrice}</td>
-                  <td style={styles.td}>{trade.stopLoss === 0 ? '-' : trade.stopLoss}</td>
                   <td style={styles.td}>{trade.exitPrice === 0 ? '-' : trade.exitPrice}</td>
-                  
-                  <td style={{...styles.td, color: trade.riskReward >= 0 ? '#219653' : '#EB5757', fontWeight: 'bold'}}>
-                    {trade.riskReward ? `${trade.riskReward}R` : '-'}
-                  </td>
 
                   <td style={{...styles.td, color: trade.profitLoss > 0 ? '#219653' : '#EB5757', fontWeight: 'bold'}}>
                     ${trade.profitLoss}
@@ -306,7 +271,7 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
                   <td style={styles.td}><input type="checkbox" checked={trade.followedPlan !== false} readOnly style={styles.checkbox}/></td>
                   <td style={styles.td}><input type="checkbox" checked={trade.be || false} readOnly style={styles.checkbox}/></td>
                   <td style={styles.td}><span style={styles.pill('Window')}>{trade.entryWindow || '-'}</span></td>
-                  <td style={styles.td}><span style={styles.pill('Model')}>{trade.model || 'Manual'}</span></td>
+                  <td style={styles.td}><span style={styles.pill('Model')}>{trade.model || '-'}</span></td>
                   <td style={styles.td}>
                     {(trade.positiveTags || []).map(tag => <span key={tag} style={styles.tagPos}>{tag}</span>)}
                   </td>
@@ -325,10 +290,11 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade }) => {
             
             {trades && trades.length > 0 && (
               <tr style={styles.footerRow}>
-                <td style={{ ...styles.td, textAlign: 'right', paddingRight: '16px' }} colSpan={8}>SUM / AVG</td>
-                <td style={{...styles.td, color: '#FFFFFF'}}>{summary.avgRR}R</td>
+                {/* 🟢 Shifted colSpan to account for the 2 new columns */}
+                <td style={{ ...styles.td, textAlign: 'right', paddingRight: '16px' }} colSpan={7}>SUM / AVG</td>
                 <td style={{...styles.td, color: '#FFFFFF'}}>${summary.totalPnL}</td>
                 <td style={{...styles.td, color: '#FFFFFF'}}>{summary.planPercent}%</td>
+                <td style={styles.td}></td>
                 <td style={styles.td} colSpan={5}></td>
                 <td style={{...styles.td, color: '#FFFFFF'}}>{summary.avgRating}</td>
                 <td style={{...styles.td, color: '#FFFFFF'}}>{summary.winRate}%</td>
