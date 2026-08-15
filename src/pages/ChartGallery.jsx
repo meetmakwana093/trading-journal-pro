@@ -10,7 +10,7 @@ const ChartGallery = ({ charts = [], onAddChart, onDeleteChart }) => {
     symbol: 'BANKNIFTY',
     setupName: 'SMC - Liquidity Sweep',
     date: new Date().toISOString().split('T')[0],
-    imageUrl: '',
+    imageUrl: '', // This will now hold the Base64 image data
     pnl: 0,
     mistakes: '',
     lessons: 'Risk management 1:1 maintained.'
@@ -21,9 +21,21 @@ const ChartGallery = ({ charts = [], onAddChart, onDeleteChart }) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // 🟢 NEW: Handle File Upload from Computer
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({ ...prev, imageUrl: reader.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.imageUrl.trim()) return alert("Please provide an image URL.");
+    if (!formData.imageUrl.trim()) return alert("Please select an image file from your computer.");
     
     onAddChart({
       symbol: formData.symbol.toUpperCase(),
@@ -57,15 +69,12 @@ const ChartGallery = ({ charts = [], onAddChart, onDeleteChart }) => {
     label: { fontSize: '12px', color: '#9B9A97', fontWeight: 'bold', textTransform: 'uppercase' },
     input: { backgroundColor: '#191919', border: '1px solid rgba(255,255,255,0.1)', color: '#FFFFFF', padding: '10px 14px', borderRadius: '6px', fontSize: '14px', outline: 'none' },
     submitButton: { backgroundColor: '#219653', color: 'white', border: 'none', padding: '12px 20px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', marginTop: '20px', width: '100%' },
-    
     filterBar: { display: 'flex', gap: '10px', marginBottom: '20px' },
     filterBtn: (isActive) => ({ backgroundColor: isActive ? 'rgba(45, 156, 219, 0.2)' : 'transparent', color: isActive ? '#2D9CDB' : '#9B9A97', border: isActive ? '1px solid rgba(45, 156, 219, 0.5)' : '1px solid rgba(255,255,255,0.1)', padding: '6px 16px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px', transition: 'all 0.2s' }),
-    
     masonryGrid: { columnCount: 3, columnGap: '20px' },
     masonryItem: { breakInside: 'avoid', marginBottom: '20px', position: 'relative', cursor: 'pointer', borderRadius: '12px', overflow: 'hidden', background: '#262626', border: '1px solid rgba(255,255,255,0.05)' },
     image: { width: '100%', display: 'block', objectFit: 'cover' },
     imageOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.9), transparent)', padding: '30px 15px 15px 15px', color: '#FFF' },
-    
     lightboxOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.9)', zIndex: 9999, display: 'flex', backdropFilter: 'blur(5px)' },
     lightboxImageContainer: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' },
     lightboxImage: { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 10px 40px rgba(0,0,0,0.5)' },
@@ -110,10 +119,16 @@ const ChartGallery = ({ charts = [], onAddChart, onDeleteChart }) => {
                 <label style={styles.label}>Profit / Loss ($)</label>
                 <input style={styles.input} type="number" step="any" name="pnl" value={formData.pnl} onChange={handleChange} required />
               </div>
+              
+              {/* 🟢 FIXED: File Upload Input instead of URL Text Input */}
               <div style={{ ...styles.inputGroup, gridColumn: 'span 2' }}>
-                <label style={styles.label}>Image URL (TradingView / Imgur)</label>
-                <input style={styles.input} type="url" name="imageUrl" value={formData.imageUrl} onChange={handleChange} placeholder="https://..." required />
+                <label style={styles.label}>Upload Chart Image (From Computer)</label>
+                <input style={{...styles.input, padding: '8px', cursor: 'pointer'}} type="file" accept="image/*" onChange={handleImageUpload} required />
+                {formData.imageUrl && (
+                  <img src={formData.imageUrl} alt="Preview" style={{ marginTop: '10px', height: '100px', objectFit: 'contain', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)', alignSelf: 'flex-start' }} />
+                )}
               </div>
+
               <div style={{ ...styles.inputGroup, gridColumn: 'span 2' }}>
                 <label style={styles.label}>What went wrong? (Mistakes)</label>
                 <textarea style={{ ...styles.input, minHeight: '60px', resize: 'vertical' }} name="mistakes" value={formData.mistakes} onChange={handleChange} placeholder="Early entry, ignored trend..." />
@@ -138,7 +153,7 @@ const ChartGallery = ({ charts = [], onAddChart, onDeleteChart }) => {
 
       {filteredCharts.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px', color: '#9B9A97', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '8px' }}>
-          No charts found. Upload a screenshot link to build your visual journal!
+          No charts found. Upload a screenshot to build your visual journal!
         </div>
       ) : (
         <div style={styles.masonryGrid}>

@@ -1,12 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// 🟢 NEW: Added onUpdateTrade to props
 const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateTrade }) => {
   
-  // Form State
   const [showForm, setShowForm] = useState(false);
-  const [editingTradeId, setEditingTradeId] = useState(null); // 🟢 NEW: Tracks which trade is being edited
+  const [editingTradeId, setEditingTradeId] = useState(null); 
 
   const defaultFormState = {
     symbol: 'EURUSD',
@@ -17,6 +15,7 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateT
     stopLoss: '',
     exitPrice: '',
     playbookId: '',
+    model: '', // 🟢 FIXED: Brought this back so you can type manually
     profitLoss: 0,
     followedPlan: true,
     be: false,
@@ -29,7 +28,6 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateT
 
   const [formData, setFormData] = useState(defaultFormState);
 
-  // Calculate R-Multiple automatically
   const calculatedRR = useMemo(() => {
     const entry = parseFloat(formData.entryPrice);
     const exit = parseFloat(formData.exitPrice);
@@ -42,7 +40,6 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateT
     return parseFloat((reward / risk).toFixed(2));
   }, [formData.entryPrice, formData.exitPrice, formData.stopLoss, formData.direction]);
 
-  // Handle Form Input Changes
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({
@@ -51,18 +48,18 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateT
     }));
   };
 
-  // 🟢 NEW: Handle Edit Button Click
   const handleEditClick = (trade) => {
     setEditingTradeId(trade.id);
     setFormData({
       symbol: trade.symbol,
-      date: trade.date || trade.entryTime.split(' ')[0], // Extract date part safely
+      date: trade.date || trade.entryTime.split(' ')[0], 
       session: trade.session || 'New York',
       direction: trade.direction || 'LONG',
       entryPrice: trade.entryPrice === 0 ? '' : trade.entryPrice,
       stopLoss: trade.stopLoss === 0 ? '' : trade.stopLoss,
       exitPrice: trade.exitPrice === 0 ? '' : trade.exitPrice,
       playbookId: trade.playbookId || '',
+      model: trade.playbookId ? '' : trade.model, // Load custom model if it exists
       profitLoss: trade.profitLoss,
       followedPlan: trade.followedPlan !== false,
       be: trade.be || false,
@@ -73,20 +70,19 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateT
       rating: trade.rating || 5
     });
     setShowForm(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' }); // Scroll up to see the form
+    window.scrollTo({ top: 0, behavior: 'smooth' }); 
   };
 
-  // Submit New or Edited Trade
   const handleSubmit = (e) => {
     e.preventDefault();
     const dateObj = new Date(formData.date);
     
     // Resolve Playbook Model Name
     const selectedPb = playbooks.find(p => p.id === parseInt(formData.playbookId));
-    const modelName = selectedPb ? selectedPb.name : 'Custom / Manual';
+    const finalModelName = selectedPb ? selectedPb.name : formData.model;
 
     const tradePayload = {
-      id: editingTradeId || Date.now(), // 🟢 NEW: Use existing ID if editing
+      id: editingTradeId || Date.now(), 
       symbol: formData.symbol.toUpperCase(),
       entryPrice: parseFloat(formData.entryPrice) || 0,
       stopLoss: parseFloat(formData.stopLoss) || 0,
@@ -102,7 +98,7 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateT
       followedPlan: formData.followedPlan,
       be: formData.be,
       entryWindow: formData.entryWindow,
-      model: modelName,
+      model: finalModelName, // Uses Custom Model if Playbook isn't selected
       playbookId: formData.playbookId ? parseInt(formData.playbookId) : null,
       positiveTags: formData.positiveTags.split(',').map(t => t.trim()).filter(t => t),
       negativeTags: formData.negativeTags.split(',').map(t => t.trim()).filter(t => t),
@@ -114,7 +110,6 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateT
       year: dateObj.getFullYear()
     };
 
-    // 🟢 NEW: Route to the correct App.jsx function
     if (editingTradeId) {
       onUpdateTrade(tradePayload);
       setEditingTradeId(null);
@@ -126,7 +121,6 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateT
     setFormData(defaultFormState);
   };
 
-  // Calculate Footer Summary Metrics
   const summary = useMemo(() => {
     if (!trades || trades.length === 0) return { totalPnL: 0, planPercent: 0, avgRating: 0, winRate: 0, avgRR: 0 };
     const totalPnL = trades.reduce((sum, t) => sum + t.profitLoss, 0);
@@ -144,7 +138,6 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateT
     };
   }, [trades]);
 
-  // Styles (100% Original styling)
   const styles = {
     container: { backgroundColor: '#191919', color: '#E0E0E0', minHeight: '100vh', padding: '20px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif' },
     header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
@@ -161,7 +154,7 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateT
     table: { width: '100%', minWidth: '1700px', borderCollapse: 'collapse', fontSize: '14px' },
     th: { textAlign: 'left', padding: '12px 16px', color: '#9B9A97', fontWeight: '500', borderBottom: '1px solid rgba(255,255,255,0.1)', whiteSpace: 'nowrap' },
     td: { padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', whiteSpace: 'nowrap' },
-    editBtn: { backgroundColor: 'transparent', color: '#2D9CDB', border: '1px solid rgba(45, 156, 219, 0.4)', borderRadius: '4px', cursor: 'pointer', padding: '4px 8px', fontSize: '12px', transition: 'all 0.2s', marginRight: '8px' }, // 🟢 NEW
+    editBtn: { backgroundColor: 'transparent', color: '#2D9CDB', border: '1px solid rgba(45, 156, 219, 0.4)', borderRadius: '4px', cursor: 'pointer', padding: '4px 8px', fontSize: '12px', transition: 'all 0.2s', marginRight: '8px' },
     deleteBtn: { backgroundColor: 'transparent', color: '#EB5757', border: '1px solid rgba(235, 87, 87, 0.4)', borderRadius: '4px', cursor: 'pointer', padding: '4px 8px', fontSize: '12px', transition: 'all 0.2s' },
     pill: (type) => {
       const base = { padding: '2px 6px', borderRadius: '3px', fontSize: '13px', display: 'inline-block' };
@@ -209,7 +202,6 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateT
             style={styles.formContainer}
             onSubmit={handleSubmit}
           >
-            {/* 🟢 NEW: Shows "Editing Trade" badge if in edit mode */}
             {editingTradeId && (
               <div style={{ color: '#2D9CDB', fontWeight: 'bold', marginBottom: '15px', borderBottom: '1px solid rgba(45, 156, 219, 0.2)', paddingBottom: '10px' }}>
                 ✏️ Editing Trade Record
@@ -265,6 +257,7 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateT
                 <label style={styles.label}>Profit / Loss ($)</label>
                 <input style={styles.input} type="number" step="any" name="profitLoss" value={formData.profitLoss} onChange={handleChange} required />
               </div>
+
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Playbook Model</label>
                 <select style={styles.input} name="playbookId" value={formData.playbookId} onChange={handleChange}>
@@ -272,6 +265,15 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateT
                   {playbooks.map(pb => <option key={pb.id} value={pb.id}>{pb.name}</option>)}
                 </select>
               </div>
+
+              {/* 🟢 FIXED: If they didn't pick a playbook, let them type a custom model name */}
+              {!formData.playbookId && (
+                <div style={styles.inputGroup}>
+                  <label style={styles.label}>Custom Model Name</label>
+                  <input style={styles.input} type="text" name="model" placeholder="e.g. My Custom Setup" value={formData.model} onChange={handleChange} />
+                </div>
+              )}
+
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Entry Window</label>
                 <input style={styles.input} type="text" name="entryWindow" placeholder="e.g., 9-10am" value={formData.entryWindow} onChange={handleChange} />
@@ -314,14 +316,12 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateT
               <th style={styles.th}>📈 Pairs</th>
               <th style={styles.th}>⏳ Session</th>
               <th style={styles.th}>↕️ Direction</th>
-              
               <th style={styles.th}>🎯 Entry</th>
               <th style={styles.th}>🛡️ SL</th>
               <th style={styles.th}>🏁 Exit</th>
               <th style={styles.th}>⚖️ R:R</th>
               <th style={styles.th}>💵 P/L</th>
               <th style={styles.th}>🎯 Model</th>
-
               <th style={styles.th}>☑️ Plan</th>
               <th style={styles.th}>☑️ BE</th>
               <th style={styles.th}>🕒 Window</th>
@@ -348,12 +348,13 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateT
                   <td style={styles.td}><strong>{trade.symbol}</strong></td>
                   <td style={styles.td}><span style={styles.pill(trade.session || 'New York')}>{trade.session || 'N/A'}</span></td>
                   <td style={styles.td}><span style={styles.pill(trade.direction || (trade.profitLoss > 0 ? 'LONG' : 'SHORT'))}>{trade.direction || '-'}</span></td>
-                  
                   <td style={styles.td}>{trade.entryPrice === 0 ? '-' : trade.entryPrice}</td>
                   <td style={styles.td}>{trade.stopLoss === 0 ? '-' : trade.stopLoss}</td>
                   <td style={styles.td}>{trade.exitPrice === 0 ? '-' : trade.exitPrice}</td>
                   <td style={{...styles.td, color: trade.riskReward >= 0 ? '#219653' : '#EB5757', fontWeight: 'bold'}}>{trade.riskReward ? `${trade.riskReward}R` : '-'}</td>
                   <td style={{...styles.td, color: trade.profitLoss > 0 ? '#219653' : '#EB5757', fontWeight: 'bold'}}>${trade.profitLoss}</td>
+                  
+                  {/* Model column logic */}
                   <td style={styles.td}><span style={styles.pill('Model')}>{trade.model || 'Manual'}</span></td>
 
                   <td style={styles.td}><input type="checkbox" checked={trade.followedPlan !== false} readOnly style={styles.checkbox}/></td>
@@ -364,8 +365,6 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateT
                   <td style={styles.td}><span style={styles.pill(trade.account || 'Account1')}>{trade.account || '-'}</span></td>
                   <td style={{...styles.td, color: '#F2C94C', letterSpacing: '2px'}}>{renderStars(trade.rating)}</td>
                   <td style={styles.td}><input type="checkbox" checked={trade.win || trade.profitLoss > 0} readOnly style={styles.checkbox}/></td>
-                  
-                  {/* 🟢 NEW: Edit & Delete Buttons Side-by-Side */}
                   <td style={styles.td}>
                     <button style={styles.editBtn} onClick={() => handleEditClick(trade)}>Edit</button>
                     <button style={styles.deleteBtn} onClick={() => onDeleteTrade(trade.id)}>Delete</button>
