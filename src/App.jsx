@@ -785,7 +785,7 @@ export default function App() {
               {activeTab === 'playbook' ? (
                 <Playbook playbooks={playbooks} trades={trades} onAddPlaybook={handleAddPlaybook} onDeletePlaybook={handleDeletePlaybook} />
               ) : activeTab === 'chartGallery' ? (
-                <ChartGallery charts={charts} onAddChart={handleAddChart} onDeleteChart={handleDeleteChart} />
+                <ChartGallery charts={charts} playbooks={playbooks} onAddChart={handleAddChart} onDeleteChart={handleDeleteChart} />
               ) : activeTab === 'analytics' ? (
                 <Analytics trades={trades} />
               ) : activeTab === 'review' ? (

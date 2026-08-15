@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const ChartGallery = ({ charts = [], onAddChart, onDeleteChart }) => {
+// 🟢 NEW: Added playbooks to props
+const ChartGallery = ({ charts = [], playbooks = [], onAddChart, onDeleteChart }) => {
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState('All'); 
   const [selectedChart, setSelectedChart] = useState(null); 
 
   const [formData, setFormData] = useState({
     symbol: 'BANKNIFTY',
-    setupName: 'SMC - Liquidity Sweep',
+    playbookId: '', // 🟢 NEW: Added playbookId for the dropdown
+    setupName: '',  // Fallback for custom typing
     date: new Date().toISOString().split('T')[0],
-    imageUrl: '', // This will now hold the Base64 image data
+    imageUrl: '', 
     pnl: 0,
     mistakes: '',
     lessons: 'Risk management 1:1 maintained.'
@@ -21,7 +23,6 @@ const ChartGallery = ({ charts = [], onAddChart, onDeleteChart }) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // 🟢 NEW: Handle File Upload from Computer
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -37,9 +38,13 @@ const ChartGallery = ({ charts = [], onAddChart, onDeleteChart }) => {
     e.preventDefault();
     if (!formData.imageUrl.trim()) return alert("Please select an image file from your computer.");
     
+    // 🟢 NEW: Resolve Playbook Model Name (just like TradesDB)
+    const selectedPb = playbooks.find(p => p.id === parseInt(formData.playbookId));
+    const finalModelName = selectedPb ? selectedPb.name : (formData.setupName || 'Manual Setup');
+
     onAddChart({
       symbol: formData.symbol.toUpperCase(),
-      setupName: formData.setupName,
+      setupName: finalModelName, // Sends the correct Playbook Name to the database
       date: formData.date,
       imageUrl: formData.imageUrl,
       pnl: parseFloat(formData.pnl) || 0,
@@ -48,15 +53,19 @@ const ChartGallery = ({ charts = [], onAddChart, onDeleteChart }) => {
     });
     
     setShowForm(false);
-    setFormData(prev => ({ ...prev, imageUrl: '', pnl: 0, mistakes: '', lessons: '' }));
+    setFormData(prev => ({ ...prev, imageUrl: '', pnl: 0, mistakes: '', lessons: '', playbookId: '', setupName: '' }));
   };
 
+  // 🟢 NEW: Filter logic perfectly matches Playbook names now
   const filteredCharts = charts.filter(chart => {
     if (filter === 'Winners') return chart.pnl > 0;
     if (filter === 'Losers') return chart.pnl <= 0;
-    if (filter === 'SMC') return chart.setupName.toLowerCase().includes('smc');
+    if (filter !== 'All') return chart.setupName === filter; 
     return true; 
   });
+
+  // 🟢 NEW: Dynamic tabs based on your actual Playbooks
+  const filterTabs = ['All', 'Winners', 'Losers', ...playbooks.map(pb => pb.name)];
 
   const styles = {
     container: { backgroundColor: '#191919', color: '#E0E0E0', minHeight: '100vh', padding: '20px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif' },
@@ -69,7 +78,7 @@ const ChartGallery = ({ charts = [], onAddChart, onDeleteChart }) => {
     label: { fontSize: '12px', color: '#9B9A97', fontWeight: 'bold', textTransform: 'uppercase' },
     input: { backgroundColor: '#191919', border: '1px solid rgba(255,255,255,0.1)', color: '#FFFFFF', padding: '10px 14px', borderRadius: '6px', fontSize: '14px', outline: 'none' },
     submitButton: { backgroundColor: '#219653', color: 'white', border: 'none', padding: '12px 20px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', marginTop: '20px', width: '100%' },
-    filterBar: { display: 'flex', gap: '10px', marginBottom: '20px' },
+    filterBar: { display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' },
     filterBtn: (isActive) => ({ backgroundColor: isActive ? 'rgba(45, 156, 219, 0.2)' : 'transparent', color: isActive ? '#2D9CDB' : '#9B9A97', border: isActive ? '1px solid rgba(45, 156, 219, 0.5)' : '1px solid rgba(255,255,255,0.1)', padding: '6px 16px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px', transition: 'all 0.2s' }),
     masonryGrid: { columnCount: 3, columnGap: '20px' },
     masonryItem: { breakInside: 'avoid', marginBottom: '20px', position: 'relative', cursor: 'pointer', borderRadius: '12px', overflow: 'hidden', background: '#262626', border: '1px solid rgba(255,255,255,0.05)' },
@@ -107,10 +116,24 @@ const ChartGallery = ({ charts = [], onAddChart, onDeleteChart }) => {
                 <label style={styles.label}>Symbol</label>
                 <input style={styles.input} name="symbol" value={formData.symbol} onChange={handleChange} required />
               </div>
+
+              {/* 🟢 NEW: Playbook Dropdown */}
               <div style={styles.inputGroup}>
-                <label style={styles.label}>Setup / Model Name</label>
-                <input style={styles.input} name="setupName" value={formData.setupName} onChange={handleChange} placeholder="e.g. SMC FVG" />
+                <label style={styles.label}>Playbook Model</label>
+                <select style={styles.input} name="playbookId" value={formData.playbookId} onChange={handleChange}>
+                  <option value="">-- Custom / Manual --</option>
+                  {playbooks.map(pb => <option key={pb.id} value={pb.id}>{pb.name}</option>)}
+                </select>
               </div>
+
+              {/* 🟢 NEW: Custom Input Fallback */}
+              {!formData.playbookId && (
+                <div style={styles.inputGroup}>
+                  <label style={styles.label}>Custom Setup Name</label>
+                  <input style={styles.input} name="setupName" value={formData.setupName} onChange={handleChange} placeholder="e.g. My Custom Setup" />
+                </div>
+              )}
+
               <div style={styles.inputGroup}>
                 <label style={styles.label}>Date Executed</label>
                 <input style={styles.input} type="date" name="date" value={formData.date} onChange={handleChange} required />
@@ -120,7 +143,6 @@ const ChartGallery = ({ charts = [], onAddChart, onDeleteChart }) => {
                 <input style={styles.input} type="number" step="any" name="pnl" value={formData.pnl} onChange={handleChange} required />
               </div>
               
-              {/* 🟢 FIXED: File Upload Input instead of URL Text Input */}
               <div style={{ ...styles.inputGroup, gridColumn: 'span 2' }}>
                 <label style={styles.label}>Upload Chart Image (From Computer)</label>
                 <input style={{...styles.input, padding: '8px', cursor: 'pointer'}} type="file" accept="image/*" onChange={handleImageUpload} required />
@@ -144,7 +166,8 @@ const ChartGallery = ({ charts = [], onAddChart, onDeleteChart }) => {
       </AnimatePresence>
 
       <div style={styles.filterBar}>
-        {['All', 'Winners', 'Losers', 'SMC'].map(f => (
+        {/* 🟢 NEW: Iterates over the dynamic filter tabs list */}
+        {filterTabs.map(f => (
           <button key={f} style={styles.filterBtn(filter === f)} onClick={() => setFilter(f)}>
             {f}
           </button>
@@ -153,7 +176,7 @@ const ChartGallery = ({ charts = [], onAddChart, onDeleteChart }) => {
 
       {filteredCharts.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px', color: '#9B9A97', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '8px' }}>
-          No charts found. Upload a screenshot to build your visual journal!
+          No charts found for this category. Upload a screenshot to build your visual journal!
         </div>
       ) : (
         <div style={styles.masonryGrid}>
@@ -169,7 +192,7 @@ const ChartGallery = ({ charts = [], onAddChart, onDeleteChart }) => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                   <span style={{ fontWeight: 'bold', fontSize: '1.2rem', color: '#FFF' }}>{chart.symbol}</span>
                   <span style={{ fontWeight: 'bold', fontSize: '1.1rem', color: chart.pnl >= 0 ? '#219653' : '#EB5757' }}>
-                    ${chart.pnl}
+                    {chart.pnl >= 0 ? `+$${chart.pnl}` : `-$${Math.abs(chart.pnl)}`}
                   </span>
                 </div>
                 <div style={{ color: '#9B9A97', fontSize: '0.8rem' }}>{chart.setupName || 'Manual Trade'} • {new Date(chart.date).toLocaleDateString()}</div>
@@ -206,7 +229,7 @@ const ChartGallery = ({ charts = [], onAddChart, onDeleteChart }) => {
                   <div style={{ color: '#9B9A97', fontSize: '14px' }}>{new Date(selectedChart.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
                 </div>
                 <div style={{ background: selectedChart.pnl >= 0 ? 'rgba(33, 150, 83, 0.2)' : 'rgba(235, 87, 87, 0.2)', color: selectedChart.pnl >= 0 ? '#219653' : '#EB5757', padding: '8px 12px', borderRadius: '8px', fontWeight: 'bold', fontSize: '18px' }}>
-                  ${selectedChart.pnl}
+                  {selectedChart.pnl >= 0 ? `+$${selectedChart.pnl}` : `-$${Math.abs(selectedChart.pnl)}`}
                 </div>
               </div>
 
