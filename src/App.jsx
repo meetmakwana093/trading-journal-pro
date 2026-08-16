@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar, AreaChart, Area, ResponsiveContainer, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { motion, useMotionValue, useSpring, AnimatePresence } from 'framer-motion';
+
+// Pages
 import ReviewPage from './pages/ReviewPage';
 import MilestonesPage from './pages/MilestonesPage';
 import Analytics from './pages/Analytics.jsx';
@@ -9,6 +11,12 @@ import TradesDB from './pages/TradeDB.jsx';
 import Playbook from './pages/Playbook.jsx';
 import ChartGallery from './pages/ChartGallery.jsx';
 import LoginPage from './pages/LoginPage';
+
+// 🟢 NEW: Tools & Workflow Pages
+import DailyPrep from './pages/DailyPrep.jsx';
+import EconomicCalendar from './pages/EconomicCalendar.jsx';
+import AICoach from './pages/AICoach.jsx';
+
 import { getUser, getToken, saveAuth, logout } from './auth/authService';
 import './App.css';
 
@@ -76,7 +84,6 @@ const MagneticCard = ({ children, style, className, ...props }) => {
   );
 };
 
-// 🟢 NEW: Classy Dynamic Tooltip
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     const val = payload[0].value;
@@ -296,6 +303,7 @@ export default function App() {
     }
   };
 
+  // 🟢 NEW: Comprehensive Sidebar Navigation with Tools & Workflow
   const sidebarGroups = [
     {
       category: 'Overview',
@@ -319,8 +327,22 @@ export default function App() {
         { label: 'Analytics', value: 'analytics', icon: '📊' },
         { label: 'Journal Review', value: 'review', icon: '📝' },
       ]
+    },
+    {
+      category: 'Tools & Workflow',
+      items: [
+        { label: 'Pre-Market Prep', value: 'dailyPrep', icon: '📓' },
+        { label: 'Economic Calendar', value: 'economicCalendar', icon: '📅' },
+        { label: 'AI Trading Coach', value: 'aiCoach', icon: '🤖' }
+      ]
     }
   ];
+
+  // Calculate Active Winning Streak
+  const currentStreak = trades.slice(0, 5).reduce(
+    (acc, t) => (t.profitLoss > 0 && acc.active ? { count: acc.count + 1, active: true } : { ...acc, active: false }),
+    { count: 0, active: true }
+  ).count;
 
   const calculateMetrics = (trades) => {
     const total = trades.length;
@@ -372,8 +394,8 @@ export default function App() {
     });
   };
 
-  // 🟢 NEW: Mathematical Split Gradient Calculation
   const accountGrowthData = calculateAccountGrowth(trades);
+  
   const getGradientOffset = () => {
     if (accountGrowthData.length === 0) return 0;
     const dataMax = Math.max(...accountGrowthData.map(i => i.cumulative));
@@ -382,6 +404,7 @@ export default function App() {
     if (dataMin >= 0) return 1;
     return dataMax / (dataMax - dataMin);
   };
+  
   const off = getGradientOffset();
 
   const calculateRecoveryFactor = (trades) => {
@@ -558,6 +581,18 @@ export default function App() {
                   </div>
                 ))}
               </div>
+
+              {/* 🟢 DYNAMIC SIDEBAR METRICS WIDGETS */}
+              <div style={{ padding: '16px', borderTop: '1px solid rgba(255,255,255,0.04)', background: 'rgba(255,255,255,0.01)' }}>
+                <div style={{ background: 'rgba(0,255,136,0.05)', border: '1px solid rgba(0,255,136,0.15)', borderRadius: '10px', padding: '10px 14px', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Execution Streak</span>
+                  <span style={{ color: '#00FF88', fontWeight: 800, fontSize: '0.85rem' }}>🔥 {currentStreak} Wins</span>
+                </div>
+                <div style={{ fontSize: '0.7rem', color: '#6B7280', marginBottom: '4px' }}>Monthly Yield Target</div>
+                <div style={{ height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.min(Math.max((metrics.totalPnL / 1000) * 100, 0), 100)}%`, height: '100%', background: '#00FF88' }} />
+                </div>
+              </div>
             </motion.div>
           </>
         )}
@@ -613,11 +648,18 @@ export default function App() {
             {activeTab === 'home' ? (
               <motion.div
                 key="home"
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 style={{ display: 'flex', gap: '1.5rem', width: '100%' }}
               >
                 <div className="left-column">
-                  <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <motion.div
+                    initial={{ opacity: 0, x: -30 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.1 }}
+                    style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+                  >
                     <MagneticCard style={{ background: 'rgba(13,17,28,0.9)', border: '1px solid rgba(0,255,136,0.12)', borderRadius: '16px', padding: '20px', boxShadow: '0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
                       <h3 style={{ color: 'rgba(255,255,255,0.7)', margin: '0 0 15px 0', fontSize: '0.8rem', textAlign: 'center', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Performance Profile</h3>
                       <ResponsiveContainer width="100%" height={230}>
@@ -650,7 +692,6 @@ export default function App() {
                       </ResponsiveContainer>
                     </MagneticCard>
 
-                    {/* 🟢 NEW: Psychology Bleed Widget */}
                     <MagneticCard style={{ background: 'rgba(13,17,28,0.95)', border: '1px solid rgba(255,51,51,0.2)', borderRadius: '16px', padding: '20px', boxShadow: '0 4px 24px rgba(255,51,51,0.05), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
                       <h3 style={{ color: '#FF3333', margin: '0 0 15px 0', fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between' }}>
                         <span>Psychology Bleed</span>
@@ -676,9 +717,18 @@ export default function App() {
                 </div>
 
                 <div className="center-column">
-                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.15 }}
+                  >
                     <div style={{ textAlign: 'center', marginBottom: '24px', background: 'linear-gradient(135deg, rgba(0,255,136,0.04) 0%, rgba(59,130,246,0.03) 100%)', padding: '28px 24px', borderRadius: '20px', border: '1px solid rgba(0,255,136,0.1)', boxShadow: '0 0 60px rgba(0,255,136,0.04), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
-                      <motion.h1 initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} style={{ fontSize: '2.2rem', fontWeight: 800, margin: '0 0 8px 0', background: 'linear-gradient(135deg, #ffffff 0%, #00FF88 60%, #3b82f6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', letterSpacing: '-0.03em', lineHeight: 1.1 }}>
+                      <motion.h1
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                        style={{ fontSize: '2.2rem', fontWeight: 800, margin: '0 0 8px 0', background: 'linear-gradient(135deg, #ffffff 0%, #00FF88 60%, #3b82f6 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', letterSpacing: '-0.03em', lineHeight: 1.1 }}
+                      >
                         Trading Dashboard
                       </motion.h1>
                       <div style={{ display: 'flex', justifyContent: 'center', gap: '24px', marginTop: '12px', flexWrap: 'wrap' }}>
@@ -697,7 +747,14 @@ export default function App() {
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
                       {metricCards.map((card, i) => (
-                        <motion.div key={card.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 + i * 0.08 }} whileHover={{ y: -4, boxShadow: `0 12px 40px ${card.glow}` }} style={{ background: 'rgba(13,17,28,0.95)', border: `1px solid rgba(255,255,255,0.07)`, borderRadius: '16px', padding: '20px 16px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.3s', boxShadow: '0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
+                        <motion.div
+                          key={card.label}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.2 + i * 0.08 }}
+                          whileHover={{ y: -4, boxShadow: `0 12px 40px ${card.glow}` }}
+                          style={{ background: 'rgba(13,17,28,0.95)', border: `1px solid rgba(255,255,255,0.07)`, borderRadius: '16px', padding: '20px 16px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.3s', boxShadow: '0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)' }}
+                        >
                           <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', marginBottom: '10px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{card.label}</div>
                           <div style={{ color: card.color, fontSize: '2rem', fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', letterSpacing: '-0.02em' }}>
                             <AnimatedNumber value={card.value} prefix={card.prefix || ''} suffix={card.suffix || ''} />
@@ -713,7 +770,6 @@ export default function App() {
                       <ResponsiveContainer width="100%" height={260}>
                         <AreaChart data={accountGrowthData}>
                           <defs>
-                            {/* 🟢 FIXED: Split Gradients calculate mathematically where the line crosses $0 */}
                             <linearGradient id="splitColor" x1="0" y1="0" x2="0" y2="1">
                               <stop offset={off} stopColor="#00FF88" stopOpacity={0.4} />
                               <stop offset={off} stopColor="#FF3333" stopOpacity={0.4} />
@@ -726,10 +782,7 @@ export default function App() {
                           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
                           <XAxis dataKey="trade" stroke="rgba(255,255,255,0.25)" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                           <YAxis stroke="rgba(255,255,255,0.25)" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-
-                          {/* 🟢 FIXED: Custom Tooltip implemented here */}
                           <Tooltip cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1, strokeDasharray: '3 3' }} content={<CustomTooltip />} />
-
                           <Area
                             type="monotone"
                             dataKey="cumulative"
@@ -742,7 +795,12 @@ export default function App() {
                       </ResponsiveContainer>
                     </MagneticCard>
 
-                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} style={{ background: 'rgba(13,17,28,0.95)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '20px', boxShadow: '0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.4 }}
+                      style={{ background: 'rgba(13,17,28,0.95)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '20px', boxShadow: '0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)' }}
+                    >
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                         <motion.button whileHover={{ scale: 1.1, background: 'rgba(0,255,136,0.15)' }} whileTap={{ scale: 0.95 }} onClick={handlePrevMonth} style={{ background: 'rgba(0,255,136,0.06)', border: '1px solid rgba(0,255,136,0.2)', color: '#00FF88', borderRadius: '8px', padding: '6px 14px', cursor: 'pointer', fontSize: '1rem', fontWeight: 'bold', transition: 'all 0.2s' }}>←</motion.button>
                         <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{currentMonthName} {currentYear}</span>
@@ -761,7 +819,12 @@ export default function App() {
                           const isWeekend = [0, 6].includes(new Date(currentYear, currentMonth, day).getDay());
                           const dayClass = data ? (data.pnl > 0 ? 'positive' : data.pnl < 0 ? 'negative' : 'neutral') : isWeekend ? 'weekend' : '';
                           return (
-                            <motion.div key={dateStr} whileHover={{ scale: 1.08, boxShadow: data ? (data.pnl > 0 ? '0 0 12px rgba(0,255,136,0.4)' : '0 0 12px rgba(255,51,51,0.4)') : 'none' }} className={`calendar-day ${dayClass}`} style={{ transition: 'all 0.2s', borderRadius: '8px' }}>
+                            <motion.div
+                              key={dateStr}
+                              whileHover={{ scale: 1.08, boxShadow: data ? (data.pnl > 0 ? '0 0 12px rgba(0,255,136,0.4)' : '0 0 12px rgba(255,51,51,0.4)') : 'none' }}
+                              className={`calendar-day ${dayClass}`}
+                              style={{ transition: 'all 0.2s', borderRadius: '8px' }}
+                            >
                               <div className="calendar-day-number" style={{ fontSize: '0.8rem' }}>{day}</div>
                               {data && <div className="calendar-day-pnl" style={{ fontSize: '0.6rem' }}>{formatCurrency(data.pnl)}</div>}
                             </motion.div>
@@ -773,7 +836,12 @@ export default function App() {
                 </div>
 
                 <div className="right-column">
-                  <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <motion.div
+                    initial={{ opacity: 0, x: 30 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.2 }}
+                    style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+                  >
                     <div style={{ background: 'rgba(13,17,28,0.95)', border: '1px solid rgba(0,255,136,0.15)', borderRadius: '16px', padding: '24px', textAlign: 'center', boxShadow: '0 0 30px rgba(0,255,136,0.06), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
                       <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.7rem', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '8px' }}>Expectancy</div>
                       <div style={{ fontSize: '3rem', fontWeight: 800, fontFamily: 'JetBrains Mono, monospace', color: metrics.expectancy >= 0 ? '#00FF88' : '#FF3333', textShadow: metrics.expectancy >= 0 ? '0 0 30px rgba(0,255,136,0.4)' : '0 0 30px rgba(255,51,51,0.4)' }}>
@@ -797,7 +865,6 @@ export default function App() {
                       <div style={{ color: '#3b82f6', fontSize: '2rem', fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>{trades.length}</div>
                     </motion.div>
 
-                    {/* 🟢 NEW: Live Execution Feed */}
                     <MagneticCard style={{ background: 'rgba(13,17,28,0.95)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '14px', padding: '18px', boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}>
                       <h3 style={{ color: 'rgba(255,255,255,0.6)', margin: '0 0 12px 0', fontSize: '0.7rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Recent Executions</h3>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -821,14 +888,16 @@ export default function App() {
                         {trades.length === 0 && <div style={{ color: '#6B7280', fontSize: '0.8rem', textAlign: 'center', padding: '10px 0' }}>No trades logged yet.</div>}
                       </div>
                     </MagneticCard>
-
                   </motion.div>
                 </div>
               </motion.div>
             ) : (
               <motion.div
                 key={activeTab}
-                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
                 style={{ flex: 1, width: '100%', maxWidth: '100%' }}
               >
                 {activeTab === 'playbook' ? (
@@ -845,6 +914,12 @@ export default function App() {
                   <MissedTradeDB missedTrades={missedTrades} onAddMissedTrade={handleAddMissedTrade} onDeleteMissedTrade={handleDeleteMissedTrade} />
                 ) : activeTab === 'tradesDb' ? (
                   <TradesDB trades={trades} playbooks={playbooks} onAddTrade={handleAddTrade} onDeleteTrade={handleDeleteTrade} onUpdateTrade={handleUpdateTrade} />
+                ) : activeTab === 'dailyPrep' ? (
+                  <DailyPrep />
+                ) : activeTab === 'economicCalendar' ? (
+                  <EconomicCalendar />
+                ) : activeTab === 'aiCoach' ? (
+                  <AICoach trades={trades} playbooks={playbooks} />
                 ) : (
                   <div className="tab-content">Content for {activeTab}</div>
                 )}

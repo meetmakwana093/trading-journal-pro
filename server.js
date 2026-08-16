@@ -11,7 +11,6 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 const JWT_SECRET = process.env.JWT_SECRET || 'TRADING_JWT_SECRET_2024';
 
-// 1. CONNECT TO MYSQL
 const pool = mysql.createPool({
   host: '103.212.121.69',
   user: 'trade_journal_user',
@@ -27,9 +26,7 @@ pool.getConnection()
   .then(() => console.log('✅ Successfully connected to MySQL database!'))
   .catch(err => console.error('❌ Database connection error', err.stack));
 
-// ==========================================
-// AUTOMATIC DATABASE SETUP (RUNS ON STARTUP)
-// ==========================================
+// Auto-create database tables
 pool.query(`
   CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -37,11 +34,9 @@ pool.query(`
     password VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )
-`).then(() => console.log('✅ Users table ready'));
+`).catch(() => {});
 
-pool.query(`
-  ALTER TABLE trades ADD COLUMN IF NOT EXISTS user_id INT
-`).then(() => console.log('✅ user_id column ready in trades')).catch(() => {});
+pool.query(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS user_id INT`).catch(() => {});
 
 pool.query(`
   CREATE TABLE IF NOT EXISTS missed_trades (
@@ -56,7 +51,7 @@ pool.query(`
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   )
-`).then(() => console.log('✅ Missed Trades table ready'));
+`).catch(() => {});
 
 pool.query(`
   CREATE TABLE IF NOT EXISTS playbooks (
@@ -68,7 +63,7 @@ pool.query(`
     rules TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )
-`).then(() => console.log('✅ Playbooks table ready'));
+`).catch(() => {});
 
 pool.query(`
   CREATE TABLE IF NOT EXISTS chart_gallery (
@@ -83,9 +78,26 @@ pool.query(`
     lessons TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )
-`).then(() => console.log('✅ Chart Gallery table ready'));
+`).then(() => {
+  pool.query(`ALTER TABLE chart_gallery MODIFY COLUMN image_url LONGTEXT NOT NULL`).catch(() => {});
+}).catch(() => {});
 
-// 🟢 FIXED: Bulletproof column addition for all MySQL versions
+// 🟢 Pre-Market Prep Table
+pool.query(`
+  CREATE TABLE IF NOT EXISTS premarket_prep (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    date DATE NOT NULL,
+    bias VARCHAR(20) DEFAULT 'NEUTRAL',
+    readiness_score INT DEFAULT 8,
+    checklist TEXT,
+    key_levels TEXT,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_user_date (user_id, date)
+  )
+`).then(() => console.log('✅ Pre-Market Prep table ready')).catch(() => {});
+
 async function updateTradesTable() {
   const queries = [
     "ALTER TABLE trades ADD COLUMN stop_loss DECIMAL(15,4) DEFAULT 0",
@@ -93,13 +105,11 @@ async function updateTradesTable() {
     "ALTER TABLE trades ADD COLUMN playbook_id INT DEFAULT NULL"
   ];
   for (let query of queries) {
-    try { await pool.query(query); } catch (e) { /* Column already exists, safe to ignore */ }
+    try { await pool.query(query); } catch (e) {}
   }
-  console.log('✅ Trades table advanced columns ready');
 }
 updateTradesTable();
 
-// JWT MIDDLEWARE
 const verifyToken = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'No token provided' });
@@ -111,7 +121,6 @@ const verifyToken = (req, res, next) => {
   }
 };
 
-// MAPPERS
 const mapDBToReact = (row) => ({
   id: row.id,
   symbol: row.symbol,
@@ -137,20 +146,12 @@ const mapDBToReact = (row) => ({
   win: (parseFloat(row.profit_loss) || 0) > 0
 });
 
-const mapMissedDBToReact = (row) => ({
-  id: row.id, symbol: row.symbol, missedEntryPrice: parseFloat(row.missed_entry_price) || 0,
-  missedExitPrice: parseFloat(row.missed_exit_price) || 0, predictedPnl: parseFloat(row.predicted_pnl) || 0,
-  date: row.entry_time, reason: row.reason || ''
-});
-
 const mapChartDBToReact = (row) => ({
   id: row.id, symbol: row.symbol, setupName: row.setup_name || '', date: row.date,
   imageUrl: row.image_url, pnl: parseFloat(row.pnl) || 0, mistakes: row.mistakes || '', lessons: row.lessons || ''
 });
 
-// ==========================================
-// AUTH ROUTES
-// ==========================================
+// AUTH
 app.post('/api/auth/register', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
@@ -178,9 +179,7 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ==========================================
-// PLAYBOOK ROUTES
-// ==========================================
+// PLAYBOOKS
 app.get('/api/playbooks', verifyToken, async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM playbooks WHERE user_id = ? ORDER BY created_at DESC', [req.user.id]);
@@ -190,7 +189,6 @@ app.get('/api/playbooks', verifyToken, async (req, res) => {
 
 app.post('/api/playbooks', verifyToken, async (req, res) => {
   const { name, timeframe, description, rules } = req.body;
-  if (!name) return res.status(400).json({ error: 'Playbook name required' });
   try {
     const [result] = await pool.query(
       'INSERT INTO playbooks (user_id, name, timeframe, description, rules) VALUES (?, ?, ?, ?, ?)',
@@ -204,13 +202,11 @@ app.post('/api/playbooks', verifyToken, async (req, res) => {
 app.delete('/api/playbooks/:id', verifyToken, async (req, res) => {
   try {
     await pool.query('DELETE FROM playbooks WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    res.json({ message: 'Playbook deleted' });
+    res.json({ message: 'Deleted' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ==========================================
-// TRADES ROUTES
-// ==========================================
+// TRADES
 app.get('/api/trades', verifyToken, async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM trades WHERE user_id = ? ORDER BY entry_time DESC', [req.user.id]);
@@ -218,30 +214,17 @@ app.get('/api/trades', verifyToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 🟢 FIXED: Properly saves stop_loss, risk_reward, and playbook_id into MySQL
 app.post('/api/trades', verifyToken, async (req, res) => {
-  const {
-    symbol, entryPrice, exitPrice, stopLoss, profitLoss, riskReward, playbookId, 
-    entryTime, session, direction, followedPlan, rating, mistakes, wentRight,
-    entryWindow, model, positiveTags, negativeTags, account, be
-  } = req.body;
-
+  const { symbol, entryPrice, exitPrice, stopLoss, profitLoss, riskReward, playbookId, entryTime, session, direction, followedPlan, rating, mistakes, wentRight, entryWindow, model, positiveTags, negativeTags, account, be } = req.body;
   let mysqlEntryTime;
   try { mysqlEntryTime = new Date(entryTime).toISOString().slice(0, 19).replace('T', ' '); } 
   catch (e) { mysqlEntryTime = new Date().toISOString().slice(0, 19).replace('T', ' '); }
 
   try {
     const [result] = await pool.query(
-      `INSERT INTO trades
-      (symbol, entry_price, exit_price, stop_loss, profit_loss, risk_reward, playbook_id, entry_time, session,
-       direction, followed_plan, rating, mistakes, went_right, entry_window, model, positive_tags, negative_tags, account, be, user_id)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [
-        symbol || 'UNKNOWN', entryPrice || 0, exitPrice || 0, stopLoss || 0, profitLoss || 0, riskReward || 0, playbookId || null,
-        mysqlEntryTime, session || '', direction || '', followedPlan ? 1 : 0, rating || 5, mistakes || '', wentRight || '',
-        entryWindow || '', model || '', Array.isArray(positiveTags) ? positiveTags.join(',') : (positiveTags || ''),
-        Array.isArray(negativeTags) ? negativeTags.join(',') : (negativeTags || ''), account || '', be ? 1 : 0, req.user.id
-      ]
+      `INSERT INTO trades (symbol, entry_price, exit_price, stop_loss, profit_loss, risk_reward, playbook_id, entry_time, session, direction, followed_plan, rating, mistakes, went_right, entry_window, model, positive_tags, negative_tags, account, be, user_id)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [symbol || 'UNKNOWN', entryPrice || 0, exitPrice || 0, stopLoss || 0, profitLoss || 0, riskReward || 0, playbookId || null, mysqlEntryTime, session || '', direction || '', followedPlan ? 1 : 0, rating || 5, mistakes || '', wentRight || '', entryWindow || '', model || '', Array.isArray(positiveTags) ? positiveTags.join(',') : (positiveTags || ''), Array.isArray(negativeTags) ? negativeTags.join(',') : (negativeTags || ''), account || '', be ? 1 : 0, req.user.id]
     );
     const [rows] = await pool.query('SELECT * FROM trades WHERE id = ?', [result.insertId]);
     res.json(mapDBToReact(rows[0]));
@@ -250,13 +233,11 @@ app.post('/api/trades', verifyToken, async (req, res) => {
 
 app.delete('/api/trades/:id', verifyToken, async (req, res) => {
   try {
-    const [result] = await pool.query('DELETE FROM trades WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    if (result.affectedRows === 0) return res.status(404).json({ error: 'Trade not found' });
-    res.json({ message: 'Trade deleted', id: req.params.id });
+    await pool.query('DELETE FROM trades WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    res.json({ message: 'Deleted', id: req.params.id });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 🟢 FIXED: Properly updates stop_loss, risk_reward, and playbook_id into MySQL
 app.put('/api/trades/:id', verifyToken, async (req, res) => {
   const { symbol, entryPrice, exitPrice, stopLoss, profitLoss, riskReward, playbookId, entryTime, session, direction, followedPlan, rating, mistakes, wentRight, entryWindow, model, positiveTags, negativeTags, account, be } = req.body;
   let mysqlEntryTime;
@@ -267,46 +248,11 @@ app.put('/api/trades/:id', verifyToken, async (req, res) => {
       [symbol, entryPrice || 0, exitPrice || 0, stopLoss || 0, profitLoss || 0, riskReward || 0, playbookId || null, mysqlEntryTime, session || '', direction || '', followedPlan ? 1 : 0, rating || 5, mistakes || '', wentRight || '', entryWindow || '', model || '', Array.isArray(positiveTags) ? positiveTags.join(',') : (positiveTags || ''), Array.isArray(negativeTags) ? negativeTags.join(',') : (negativeTags || ''), account || '', be ? 1 : 0, req.params.id, req.user.id]
     );
     const [rows] = await pool.query('SELECT * FROM trades WHERE id = ?', [req.params.id]);
-    if (rows.length === 0) return res.status(404).json({ error: 'Trade not found' });
     res.json(mapDBToReact(rows[0]));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ==========================================
-// MISSED TRADES ROUTES
-// ==========================================
-app.get('/api/missed-trades', verifyToken, async (req, res) => {
-  try {
-    const [rows] = await pool.query('SELECT * FROM missed_trades WHERE user_id = ? ORDER BY entry_time DESC', [req.user.id]);
-    res.json(rows.map(mapMissedDBToReact));
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.post('/api/missed-trades', verifyToken, async (req, res) => {
-  const { symbol, date, missedEntryPrice, missedExitPrice, predictedPnl, reason } = req.body;
-  let mysqlEntryTime;
-  try { mysqlEntryTime = new Date(date).toISOString().slice(0, 19).replace('T', ' '); } catch (e) { mysqlEntryTime = new Date().toISOString().slice(0, 19).replace('T', ' '); }
-  try {
-    const [result] = await pool.query(
-      `INSERT INTO missed_trades (symbol, missed_entry_price, missed_exit_price, predicted_pnl, entry_time, reason, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [symbol || 'UNKNOWN', missedEntryPrice || 0, missedExitPrice || 0, predictedPnl || 0, mysqlEntryTime, reason || 'Unknown', req.user.id]
-    );
-    const [newRow] = await pool.query('SELECT * FROM missed_trades WHERE id = ?', [result.insertId]);
-    res.json(mapMissedDBToReact(newRow[0]));
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.delete('/api/missed-trades/:id', verifyToken, async (req, res) => {
-  try {
-    const [result] = await pool.query('DELETE FROM missed_trades WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    if (result.affectedRows === 0) return res.status(404).json({ error: 'Missed trade not found' });
-    res.json({ message: 'Missed trade deleted', id: req.params.id });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// ==========================================
-// CHART GALLERY ROUTES
-// ==========================================
+// CHARTS
 app.get('/api/charts', verifyToken, async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM chart_gallery WHERE user_id = ? ORDER BY date DESC', [req.user.id]);
@@ -316,14 +262,12 @@ app.get('/api/charts', verifyToken, async (req, res) => {
 
 app.post('/api/charts', verifyToken, async (req, res) => {
   const { symbol, setupName, date, imageUrl, pnl, mistakes, lessons } = req.body;
-  let mysqlEntryTime;
-  try { mysqlEntryTime = new Date(date).toISOString().slice(0, 19).replace('T', ' '); } 
-  catch (e) { mysqlEntryTime = new Date().toISOString().slice(0, 19).replace('T', ' '); }
-
+  let mysqlDate;
+  try { mysqlDate = new Date(date).toISOString().slice(0, 19).replace('T', ' '); } catch (e) { mysqlDate = new Date().toISOString().slice(0, 19).replace('T', ' '); }
   try {
     const [result] = await pool.query(
       `INSERT INTO chart_gallery (user_id, symbol, setup_name, date, image_url, pnl, mistakes, lessons) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.user.id, symbol || 'UNKNOWN', setupName || '', mysqlEntryTime, imageUrl, pnl || 0, mistakes || '', lessons || '']
+      [req.user.id, symbol || 'UNKNOWN', setupName || '', mysqlDate, imageUrl, pnl || 0, mistakes || '', lessons || '']
     );
     const [newRow] = await pool.query('SELECT * FROM chart_gallery WHERE id = ?', [result.insertId]);
     res.json(mapChartDBToReact(newRow[0]));
@@ -332,13 +276,36 @@ app.post('/api/charts', verifyToken, async (req, res) => {
 
 app.delete('/api/charts/:id', verifyToken, async (req, res) => {
   try {
-    const [result] = await pool.query('DELETE FROM chart_gallery WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-    if (result.affectedRows === 0) return res.status(404).json({ error: 'Chart not found' });
-    res.json({ message: 'Chart deleted', id: req.params.id });
+    await pool.query('DELETE FROM chart_gallery WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    res.json({ message: 'Deleted', id: req.params.id });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// START SERVER
+// 🟢 PRE-MARKET PREP ROUTES
+app.get('/api/prep/:date', verifyToken, async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM premarket_prep WHERE user_id = ? AND date = ?', [req.user.id, req.params.date]);
+    if (rows.length === 0) return res.json(null);
+    res.json(rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/prep', verifyToken, async (req, res) => {
+  const { date, bias, readiness_score, checklist, key_levels, notes } = req.body;
+  try {
+    await pool.query(
+      `INSERT INTO premarket_prep (user_id, date, bias, readiness_score, checklist, key_levels, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE bias=?, readiness_score=?, checklist=?, key_levels=?, notes=?`,
+      [
+        req.user.id, date, bias, readiness_score, JSON.stringify(checklist), key_levels, notes,
+        bias, readiness_score, JSON.stringify(checklist), key_levels, notes
+      ]
+    );
+    res.json({ success: true, message: 'Saved successfully' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Backend Server running on port ${PORT}`);
