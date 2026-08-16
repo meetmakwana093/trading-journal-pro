@@ -82,7 +82,6 @@ pool.query(`
   pool.query(`ALTER TABLE chart_gallery MODIFY COLUMN image_url LONGTEXT NOT NULL`).catch(() => {});
 }).catch(() => {});
 
-// 🟢 Pre-Market Prep Table
 pool.query(`
   CREATE TABLE IF NOT EXISTS premarket_prep (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -96,7 +95,22 @@ pool.query(`
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY unique_user_date (user_id, date)
   )
-`).then(() => console.log('✅ Pre-Market Prep table ready')).catch(() => {});
+`).catch(() => {});
+
+// 🟢 NEW: User Settings Table
+pool.query(`
+  CREATE TABLE IF NOT EXISTS user_settings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNIQUE NOT NULL,
+    starting_balance DECIMAL(15,2) DEFAULT 10000.00,
+    max_daily_loss DECIMAL(15,2) DEFAULT 500.00,
+    risk_per_trade_percent DECIMAL(5,2) DEFAULT 1.00,
+    default_session VARCHAR(50) DEFAULT 'New York',
+    default_currency VARCHAR(10) DEFAULT 'USD',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  )
+`).then(() => console.log('✅ Settings table ready')).catch(() => {});
 
 async function updateTradesTable() {
   const queries = [
@@ -231,6 +245,58 @@ app.post('/api/trades', verifyToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// 🟢 NEW: BULK TRADES IMPORT (FOR CSV PARSING)
+app.post('/api/trades/bulk', verifyToken, async (req, res) => {
+  const { trades } = req.body;
+  if (!Array.isArray(trades) || trades.length === 0) {
+    return res.status(400).json({ error: 'No trades provided' });
+  }
+
+  const values = trades.map(t => {
+    let mysqlEntryTime;
+    try { mysqlEntryTime = new Date(t.entryTime || t.date).toISOString().slice(0, 19).replace('T', ' '); }
+    catch(e) { mysqlEntryTime = new Date().toISOString().slice(0, 19).replace('T', ' '); }
+    
+    return [
+      t.symbol ? t.symbol.toUpperCase() : 'UNKNOWN',
+      parseFloat(t.entryPrice) || 0,
+      parseFloat(t.exitPrice) || 0,
+      parseFloat(t.stopLoss) || 0,
+      parseFloat(t.profitLoss) || 0,
+      parseFloat(t.riskReward) || 0,
+      null,
+      mysqlEntryTime,
+      t.session || 'New York',
+      t.direction ? t.direction.toUpperCase() : 'LONG',
+      t.followedPlan !== false ? 1 : 0,
+      parseInt(t.rating) || 5,
+      t.mistakes || '',
+      t.wentRight || '',
+      t.entryWindow || '',
+      t.model || 'CSV Import',
+      '',
+      '',
+      t.account || 'Account1',
+      0,
+      req.user.id
+    ];
+  });
+
+  try {
+    const query = `
+      INSERT INTO trades 
+      (symbol, entry_price, exit_price, stop_loss, profit_loss, risk_reward, playbook_id, entry_time, session, direction, followed_plan, rating, mistakes, went_right, entry_window, model, positive_tags, negative_tags, account, be, user_id)
+      VALUES ?
+    `;
+    await pool.query(query, [values]);
+    
+    const [rows] = await pool.query('SELECT * FROM trades WHERE user_id = ? ORDER BY entry_time DESC', [req.user.id]);
+    res.json({ message: `Successfully imported ${trades.length} trades`, trades: rows.map(mapDBToReact) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.delete('/api/trades/:id', verifyToken, async (req, res) => {
   try {
     await pool.query('DELETE FROM trades WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
@@ -281,7 +347,7 @@ app.delete('/api/charts/:id', verifyToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 🟢 PRE-MARKET PREP ROUTES
+// PRE-MARKET PREP
 app.get('/api/prep/:date', verifyToken, async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM premarket_prep WHERE user_id = ? AND date = ?', [req.user.id, req.params.date]);
@@ -303,6 +369,39 @@ app.post('/api/prep', verifyToken, async (req, res) => {
       ]
     );
     res.json({ success: true, message: 'Saved successfully' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 🟢 NEW: USER SETTINGS ROUTES
+app.get('/api/settings', verifyToken, async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM user_settings WHERE user_id = ?', [req.user.id]);
+    if (rows.length === 0) {
+      return res.json({
+        starting_balance: 10000,
+        max_daily_loss: 500,
+        risk_per_trade_percent: 1,
+        default_session: 'New York',
+        default_currency: 'USD'
+      });
+    }
+    res.json(rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/settings', verifyToken, async (req, res) => {
+  const { starting_balance, max_daily_loss, risk_per_trade_percent, default_session, default_currency } = req.body;
+  try {
+    await pool.query(
+      `INSERT INTO user_settings (user_id, starting_balance, max_daily_loss, risk_per_trade_percent, default_session, default_currency)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE starting_balance=?, max_daily_loss=?, risk_per_trade_percent=?, default_session=?, default_currency=?`,
+      [
+        req.user.id, starting_balance || 10000, max_daily_loss || 500, risk_per_trade_percent || 1, default_session || 'New York', default_currency || 'USD',
+        starting_balance || 10000, max_daily_loss || 500, risk_per_trade_percent || 1, default_session || 'New York', default_currency || 'USD'
+      ]
+    );
+    res.json({ success: true, message: 'Settings saved' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

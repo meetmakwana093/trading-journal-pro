@@ -10,12 +10,12 @@ import MissedTradeDB from './pages/MissedTradeDB.jsx';
 import TradesDB from './pages/TradeDB.jsx';
 import Playbook from './pages/Playbook.jsx';
 import ChartGallery from './pages/ChartGallery.jsx';
-import LoginPage from './pages/LoginPage';
-
-// 🟢 NEW: Tools & Workflow Pages
 import DailyPrep from './pages/DailyPrep.jsx';
 import EconomicCalendar from './pages/EconomicCalendar.jsx';
 import AICoach from './pages/AICoach.jsx';
+import DataImport from './pages/DataImport.jsx';
+import Settings from './pages/Settings.jsx';
+import LoginPage from './pages/LoginPage';
 
 import { getUser, getToken, saveAuth, logout } from './auth/authService';
 import './App.css';
@@ -303,7 +303,7 @@ export default function App() {
     }
   };
 
-  // 🟢 NEW: Comprehensive Sidebar Navigation with Tools & Workflow
+  // 🟢 COMPLETE SIDEBAR STRUCTURE
   const sidebarGroups = [
     {
       category: 'Overview',
@@ -317,6 +317,7 @@ export default function App() {
       items: [
         { label: 'Trades DB', value: 'tradesDb', icon: '📗' },
         { label: 'Missed Trades', value: 'missedTradesDb', icon: '🎯' },
+        { label: 'Broker Import', value: 'dataImport', icon: '☁️' }
       ]
     },
     {
@@ -335,10 +336,15 @@ export default function App() {
         { label: 'Economic Calendar', value: 'economicCalendar', icon: '📅' },
         { label: 'AI Trading Coach', value: 'aiCoach', icon: '🤖' }
       ]
+    },
+    {
+      category: 'Configuration',
+      items: [
+        { label: 'Risk Settings', value: 'settings', icon: '⚙️' }
+      ]
     }
   ];
 
-  // Calculate Active Winning Streak
   const currentStreak = trades.slice(0, 5).reduce(
     (acc, t) => (t.profitLoss > 0 && acc.active ? { count: acc.count + 1, active: true } : { ...acc, active: false }),
     { count: 0, active: true }
@@ -551,11 +557,11 @@ export default function App() {
 
               <div style={{ flex: 1, overflowY: 'auto', padding: '24px 16px' }}>
                 {sidebarGroups.map(group => (
-                  <div key={group.category} style={{ marginBottom: '32px' }}>
-                    <div style={{ fontSize: '0.65rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, padding: '0 12px', marginBottom: '12px' }}>
+                  <div key={group.category} style={{ marginBottom: '28px' }}>
+                    <div style={{ fontSize: '0.65rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, padding: '0 12px', marginBottom: '10px' }}>
                       {group.category}
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                       {group.items.map(item => {
                         const isActive = activeTab === item.value;
                         return (
@@ -568,7 +574,7 @@ export default function App() {
                               padding: '10px 12px', background: isActive ? 'rgba(0, 255, 136, 0.08)' : 'transparent',
                               border: 'none', borderRadius: '8px', cursor: 'pointer',
                               color: isActive ? '#00FF88' : '#9CA3AF',
-                              fontWeight: isActive ? 600 : 500, fontSize: '0.9rem',
+                              fontWeight: isActive ? 600 : 500, fontSize: '0.88rem',
                               transition: 'background 0.2s, color 0.2s', textAlign: 'left'
                             }}
                           >
@@ -582,13 +588,13 @@ export default function App() {
                 ))}
               </div>
 
-              {/* 🟢 DYNAMIC SIDEBAR METRICS WIDGETS */}
+              {/* DYNAMIC SIDEBAR METRICS WIDGETS */}
               <div style={{ padding: '16px', borderTop: '1px solid rgba(255,255,255,0.04)', background: 'rgba(255,255,255,0.01)' }}>
                 <div style={{ background: 'rgba(0,255,136,0.05)', border: '1px solid rgba(0,255,136,0.15)', borderRadius: '10px', padding: '10px 14px', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Execution Streak</span>
                   <span style={{ color: '#00FF88', fontWeight: 800, fontSize: '0.85rem' }}>🔥 {currentStreak} Wins</span>
                 </div>
-                <div style={{ fontSize: '0.7rem', color: '#6B7280', marginBottom: '4px' }}>Monthly Yield Target</div>
+                <div style={{ fontSize: '0.7rem', color: '#6B7280', marginBottom: '4px' }}>Monthly Target Progress</div>
                 <div style={{ height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden' }}>
                   <div style={{ width: `${Math.min(Math.max((metrics.totalPnL / 1000) * 100, 0), 100)}%`, height: '100%', background: '#00FF88' }} />
                 </div>
@@ -865,6 +871,7 @@ export default function App() {
                       <div style={{ color: '#3b82f6', fontSize: '2rem', fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>{trades.length}</div>
                     </motion.div>
 
+                    {/* LIVE EXECUTION FEED */}
                     <MagneticCard style={{ background: 'rgba(13,17,28,0.95)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '14px', padding: '18px', boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}>
                       <h3 style={{ color: 'rgba(255,255,255,0.6)', margin: '0 0 12px 0', fontSize: '0.7rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Recent Executions</h3>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -920,6 +927,10 @@ export default function App() {
                   <EconomicCalendar />
                 ) : activeTab === 'aiCoach' ? (
                   <AICoach trades={trades} playbooks={playbooks} />
+                ) : activeTab === 'dataImport' ? (
+                  <DataImport onBulkTradesImported={(newTrades) => setTrades(newTrades)} />
+                ) : activeTab === 'settings' ? (
+                  <Settings />
                 ) : (
                   <div className="tab-content">Content for {activeTab}</div>
                 )}
