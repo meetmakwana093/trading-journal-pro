@@ -1,28 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-  LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, 
-  BarChart, Bar, AreaChart, Area, ResponsiveContainer, Cell
+  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  ScatterChart, Scatter, ZAxis
 } from 'recharts';
 
-const Analytics = ({ trades }) => {
-  const [subTab, setSubTab] = useState('calendar');
+const Analytics = ({ trades = [] }) => {
+  const [activeTab, setActiveTab] = useState('performance'); // 'performance' or 'risk'
 
-  const calculateMetrics = (trades) => {
+  // --- 1. CORE METRICS ---
+  const metrics = useMemo(() => {
     const total = trades.length;
-    if (total === 0) return { winRate: 0, totalPnL: 0, returns: 0, profitFactor: 0, maxDrawdown: 0, avgWin: 0, avgLoss: 0 };
-
-    const winningTrades = trades.filter(t => t.profitLoss > 0);
-    const losingTrades = trades.filter(t => t.profitLoss < 0);
-    const winRate = (winningTrades.length / total) * 100;
-    const totalPnL = trades.reduce((sum, t) => sum + t.profitLoss, 0);
-    const returns = (totalPnL / 10000) * 100;
-    const grossProfit = winningTrades.reduce((sum, t) => sum + t.profitLoss, 0);
-    const grossLoss = Math.abs(losingTrades.reduce((sum, t) => sum + t.profitLoss, 0));
-    const profitFactor = grossLoss === 0 ? 0 : grossProfit / grossLoss;
-
+    if (total === 0) return { winRate: 0, totalPnL: 0, profitFactor: 0, avgWin: 0, avgLoss: 0, maxDrawdown: 0 };
+    
+    const wins = trades.filter(t => t.profitLoss > 0);
+    const losses = trades.filter(t => t.profitLoss < 0);
+    const grossProfit = wins.reduce((sum, t) => sum + t.profitLoss, 0);
+    const grossLoss = Math.abs(losses.reduce((sum, t) => sum + t.profitLoss, 0));
+    
     const sortedTrades = [...trades].sort((a, b) => new Date(a.entryTime) - new Date(b.entryTime));
     let cumulative = 0, peak = 0, maxDrawdown = 0;
+    
     sortedTrades.forEach(t => {
       cumulative += t.profitLoss;
       if (cumulative > peak) peak = cumulative;
@@ -31,200 +30,303 @@ const Analytics = ({ trades }) => {
     });
 
     return {
-      winRate: parseFloat(winRate.toFixed(2)) || 0,
-      totalPnL: parseFloat(totalPnL.toFixed(2)) || 0,
-      returns: parseFloat(returns.toFixed(2)) || 0,
-      profitFactor: parseFloat(profitFactor.toFixed(2)) || 0,
-      maxDrawdown: parseFloat(maxDrawdown.toFixed(2)) || 0,
-      avgWin: winningTrades.length === 0 ? 0 : parseFloat((grossProfit / winningTrades.length).toFixed(2)),
-      avgLoss: losingTrades.length === 0 ? 0 : parseFloat((grossLoss / losingTrades.length).toFixed(2)),
+      winRate: ((wins.length / total) * 100).toFixed(1),
+      totalPnL: (grossProfit - grossLoss).toFixed(2),
+      profitFactor: grossLoss === 0 ? grossProfit.toFixed(2) : (grossProfit / grossLoss).toFixed(2),
+      avgWin: wins.length > 0 ? (grossProfit / wins.length).toFixed(2) : 0,
+      avgLoss: losses.length > 0 ? (grossLoss / losses.length).toFixed(2) : 0,
+      maxDrawdown: maxDrawdown.toFixed(2)
     };
-  };
+  }, [trades]);
 
-  const calculateSymbolPerformance = (trades) => {
-    const symbols = [...new Set(trades.map(t => t.symbol))]; 
-    const performance = {};
-    symbols.forEach(symbol => {
-      const symbolTrades = trades.filter(t => t.symbol === symbol);
-      const total = symbolTrades.reduce((sum, t) => sum + t.profitLoss, 0);
-      performance[symbol] = parseFloat(total.toFixed(2));
-    });
-    return performance;
-  };
-
-  const calculateAccountGrowth = (trades) => {
-    const sortedTrades = [...trades].sort((a, b) => new Date(a.entryTime) - new Date(b.entryTime));
+  // --- 2. CHART DATA CALCULATIONS ---
+  const growthData = useMemo(() => {
     let cumulative = 0;
-    return sortedTrades.map((t, index) => {
+    return [...trades].sort((a, b) => new Date(a.entryTime) - new Date(b.entryTime)).map((t, i) => {
       cumulative += t.profitLoss;
-      return { trade: index + 1, cumulative: parseFloat(cumulative.toFixed(2)), date: t.entryTime };
+      return { trade: `Trade ${i + 1}`, cumulative: parseFloat(cumulative.toFixed(2)), date: t.entryTime };
     });
-  };
+  }, [trades]);
 
-  const calculateDrawdownOverTime = (trades) => {
-    const sortedTrades = [...trades].sort((a, b) => new Date(a.entryTime) - new Date(b.entryTime));
+  const drawdownData = useMemo(() => {
     let cumulative = 0, peak = 0;
-    return sortedTrades.map((t, index) => {
+    return [...trades].sort((a, b) => new Date(a.entryTime) - new Date(b.entryTime)).map((t, i) => {
       cumulative += t.profitLoss;
       if (cumulative > peak) peak = cumulative;
-      const drawdown = peak === 0 ? 0 : ((peak - cumulative) / peak) * 100;
-      return { trade: index + 1, drawdown: parseFloat(drawdown.toFixed(2)), date: t.entryTime };
+      let currentDrawdown = peak === 0 ? 0 : cumulative - peak; // Dollar drawdown
+      return { trade: `T${i + 1}`, drawdown: parseFloat(currentDrawdown.toFixed(2)) };
     });
-  };
+  }, [trades]);
 
-  // FIX: Safely checks for 0 losses or 0 wins so math doesn't return 'Infinity' and crash the tab
-  const calculateBiggestWinnerLoser = (trades) => {
-    if (trades.length === 0) return { biggestWinner: 0, biggestLoser: 0 };
-    const wins = trades.filter(t => t.profitLoss > 0).map(t => t.profitLoss);
-    const losses = trades.filter(t => t.profitLoss < 0).map(t => t.profitLoss);
-    return { 
-      biggestWinner: wins.length > 0 ? Math.max(...wins) : 0, 
-      biggestLoser: losses.length > 0 ? Math.min(...losses) : 0 
-    };
-  };
+  const symbolData = useMemo(() => {
+    const acc = {};
+    trades.forEach(t => { acc[t.symbol] = (acc[t.symbol] || 0) + t.profitLoss; });
+    return Object.keys(acc).map(symbol => ({ symbol, pnl: parseFloat(acc[symbol].toFixed(2)) })).sort((a, b) => b.pnl - a.pnl);
+  }, [trades]);
 
-  const calculateRecoveryFactor = (trades) => {
-    const totalPnL = trades.reduce((sum, t) => sum + t.profitLoss, 0);
-    const sortedTrades = [...trades].sort((a, b) => new Date(a.entryTime) - new Date(b.entryTime));
-    let cumulative = 0, peak = 0, maxDrawdown = 0;
-    sortedTrades.forEach(t => {
-      cumulative += t.profitLoss;
-      if (cumulative > peak) peak = cumulative;
-      const drawdown = peak === 0 ? 0 : ((peak - cumulative) / peak) * 100;
-      if (drawdown > maxDrawdown) maxDrawdown = drawdown;
+  const modelData = useMemo(() => {
+    const acc = {};
+    trades.forEach(t => { 
+      const m = t.model || 'Manual'; 
+      acc[m] = (acc[m] || 0) + t.profitLoss; 
     });
-    if (maxDrawdown === 0 || peak === 0) return 0;
-    const recovery = totalPnL / (maxDrawdown / 100 * Math.abs(peak));
-    return parseFloat(recovery.toFixed(2)) || 0;
+    return Object.keys(acc).map(model => ({ model, pnl: parseFloat(acc[model].toFixed(2)) })).sort((a, b) => b.pnl - a.pnl);
+  }, [trades]);
+
+  const directionData = useMemo(() => {
+    const acc = { LONG: 0, SHORT: 0 };
+    trades.forEach(t => { if (t.direction) acc[t.direction] += t.profitLoss; });
+    return [
+      { name: 'LONG', pnl: parseFloat(acc.LONG.toFixed(2)) },
+      { name: 'SHORT', pnl: parseFloat(acc.SHORT.toFixed(2)) }
+    ];
+  }, [trades]);
+
+  const winLossPieData = useMemo(() => {
+    const wins = trades.filter(t => t.profitLoss > 0).length;
+    const losses = trades.filter(t => t.profitLoss <= 0).length;
+    return [{ name: 'Wins', value: wins }, { name: 'Losses', value: losses }];
+  }, [trades]);
+
+  // --- STYLES ---
+  const COLORS = { green: '#00FF88', red: '#FF3333', darkGreen: '#00B35F', darkRed: '#B32424', bg: '#191919', cardBg: 'rgba(38, 38, 38, 0.6)', border: 'rgba(255, 255, 255, 0.05)', textMuted: '#9B9A97', textBright: '#FFF' };
+
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div style={{ background: '#191919', border: `1px solid ${COLORS.border}`, padding: '10px 15px', borderRadius: '8px', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
+          <p style={{ color: COLORS.textMuted, margin: '0 0 5px 0', fontSize: '0.8rem', textTransform: 'uppercase' }}>{label}</p>
+          {payload.map((entry, index) => (
+            <p key={index} style={{ color: entry.color || COLORS.textBright, margin: 0, fontWeight: 'bold', fontSize: '1.1rem' }}>
+              {entry.name === 'drawdown' ? '' : '$'}{entry.value}
+            </p>
+          ))}
+        </div>
+      );
+    }
+    return null;
   };
 
-  const calculateConsistencyScore = (trades) => {
-    if (trades.length === 0) return 0;
-    const winRate = trades.filter(t => t.profitLoss > 0).length / trades.length;
-    const metrics = calculateMetrics(trades);
-    const profitFactorScore = Math.min(metrics.profitFactor, 3) / 3;
-    return parseFloat((winRate * 0.6 + profitFactorScore * 0.4) * 100).toFixed(2) || 0;
+  const AnimatedNumber = ({ value, prefix = '', suffix = '' }) => {
+    return <span>{prefix}{value}{suffix}</span>; // Can be upgraded with framer-motion if desired
   };
-
-  const formatCurrency = (number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(number || 0);
-  };
-
-  const metrics = calculateMetrics(trades);
-  const symbolData = Object.entries(calculateSymbolPerformance(trades)).map(([symbol, pnl]) => ({ symbol, pnl }));
-  const bigWinLoss = calculateBiggestWinnerLoser(trades);
-  const recoveryFactor = calculateRecoveryFactor(trades);
-
-  // FIX: Safely handles NaN so animations never freeze
-  const AnimatedNumber = ({ value, prefix = '', suffix = '', isCurrency = false }) => {
-    const [animated, setAnimated] = useState(0);
-    useEffect(() => {
-      let start = animated;
-      const target = Number(value) || 0;
-      const duration = 1000;
-      const startTime = performance.now();
-      const step = (now) => {
-        const progress = Math.min((now - startTime) / duration, 1);
-        setAnimated(start + (target - start) * progress);
-        if (progress < 1) requestAnimationFrame(step);
-      };
-      requestAnimationFrame(step);
-    }, [value]);
-
-    return (
-      <motion.div whileHover={{ scale: 1.05 }} style={{ borderRadius: '8px', padding: '4px 8px', transition: 'all 0.2s' }}>
-        {prefix}{isCurrency ? formatCurrency(animated) : animated.toFixed(2)}{suffix}
-      </motion.div>
-    );
-  };
-
-  const containerStyle = { backgroundColor: '#0F0F0F', minHeight: '100vh', padding: '20px', color: 'white' };
-  const cardStyle = { backgroundColor: 'rgba(26, 26, 26, 0.8)', borderRadius: '12px', padding: '16px', marginBottom: '16px', textAlign: 'center', border: '1px solid rgba(0, 255, 136, 0.2)' };
-  const metricLabelStyle = { fontSize: '14px', opacity: 0.7, marginBottom: '8px', color: '#B0B0B0', textTransform: 'uppercase', fontWeight: 'bold' };
 
   return (
-    <div style={containerStyle}>
-      <h1 style={{ textAlign: 'center', marginBottom: '30px', color: '#00FF88' }}>Analytics</h1>
-
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-        <motion.div onClick={() => setSubTab('calendar')} style={{ padding: '8px 16px', margin: '0 4px', backgroundColor: subTab === 'calendar' ? 'rgba(0, 255, 136, 0.2)' : 'rgba(255,255,255,0.1)', border: `1px solid ${subTab === 'calendar' ? '#00FF88' : 'rgba(255,255,255,0.2)'}`, borderRadius: '8px', color: subTab === 'calendar' ? '#00FF88' : 'white', cursor: 'pointer' }}>
-          Calendar Analytics
-        </motion.div>
-        <motion.div onClick={() => setSubTab('risk')} style={{ padding: '8px 16px', margin: '0 4px', backgroundColor: subTab === 'risk' ? 'rgba(0, 255, 136, 0.2)' : 'rgba(255,255,255,0.1)', border: `1px solid ${subTab === 'risk' ? '#00FF88' : 'rgba(255,255,255,0.2)'}`, borderRadius: '8px', color: subTab === 'risk' ? '#00FF88' : 'white', cursor: 'pointer' }}>
-          Risk Analysis
-        </motion.div>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }} style={{ padding: '10px 0', color: COLORS.textBright, fontFamily: 'Inter, sans-serif' }}>
+      
+      {/* HEADER & TOGGLE */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+        <div>
+          <h1 style={{ fontSize: '28px', fontWeight: 800, margin: '0 0 4px 0' }}>📊 ADVANCED ANALYTICS</h1>
+          <p style={{ color: COLORS.textMuted, margin: 0, fontSize: '0.9rem' }}>Deep-dive into your mathematical edge.</p>
+        </div>
+        
+        {/* Sleek Segmented Control */}
+        <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', borderRadius: '12px', padding: '4px', border: `1px solid ${COLORS.border}` }}>
+          <button 
+            onClick={() => setActiveTab('performance')}
+            style={{ padding: '8px 24px', borderRadius: '8px', border: 'none', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.3s', background: activeTab === 'performance' ? 'rgba(0, 255, 136, 0.15)' : 'transparent', color: activeTab === 'performance' ? COLORS.green : COLORS.textMuted }}
+          >
+            Edge & Performance
+          </button>
+          <button 
+            onClick={() => setActiveTab('risk')}
+            style={{ padding: '8px 24px', borderRadius: '8px', border: 'none', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.3s', background: activeTab === 'risk' ? 'rgba(255, 51, 51, 0.15)' : 'transparent', color: activeTab === 'risk' ? COLORS.red : COLORS.textMuted }}
+          >
+            Risk & Drawdown
+          </button>
+        </div>
       </div>
 
-      {subTab === 'calendar' ? (
-        <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginBottom: '20px' }}>
-            <div style={cardStyle}><div style={metricLabelStyle}>Win Rate (%)</div><div style={{color: '#00FF88', fontSize: '1.5rem', fontWeight: 'bold'}}><AnimatedNumber value={metrics.winRate} suffix="%" /></div></div>
-            <div style={cardStyle}><div style={metricLabelStyle}>Total P&L ($)</div><div style={{color: metrics.totalPnL >= 0 ? '#00FF88' : '#FF3333', fontSize: '1.5rem', fontWeight: 'bold'}}><AnimatedNumber value={metrics.totalPnL} isCurrency /></div></div>
-            <div style={cardStyle}><div style={metricLabelStyle}>Profit Factor</div><div style={{color: '#00FF88', fontSize: '1.5rem', fontWeight: 'bold'}}><AnimatedNumber value={metrics.profitFactor} /></div></div>
-            <div style={cardStyle}><div style={metricLabelStyle}>Returns (%)</div><div style={{color: metrics.returns >= 0 ? '#00FF88' : '#FF3333', fontSize: '1.5rem', fontWeight: 'bold'}}><AnimatedNumber value={metrics.returns} suffix="%" /></div></div>
-          </div>
+      <AnimatePresence mode="wait">
+        {/* =========================================
+                  PERFORMANCE TAB
+        ========================================= */}
+        {activeTab === 'performance' && (
+          <motion.div key="perf" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+            
+            {/* TOP METRICS BENTO */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '20px' }}>
+              {[
+                { label: 'Win Rate', val: metrics.winRate, suffix: '%', c: COLORS.green },
+                { label: 'Net Profit', val: metrics.totalPnL, prefix: '$', c: metrics.totalPnL >= 0 ? COLORS.green : COLORS.red },
+                { label: 'Profit Factor', val: metrics.profitFactor, c: COLORS.green },
+                { label: 'Total Trades', val: trades.length, c: '#2D9CDB' }
+              ].map((m, i) => (
+                <div key={i} style={{ background: COLORS.cardBg, border: `1px solid ${COLORS.border}`, borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <span style={{ color: COLORS.textMuted, fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px', marginBottom: '8px' }}>{m.label}</span>
+                  <span style={{ color: m.c, fontSize: '2.2rem', fontWeight: 800, fontFamily: 'JetBrains Mono, monospace' }}>{m.prefix || ''}{m.val}{m.suffix || ''}</span>
+                </div>
+              ))}
+            </div>
 
-          <div style={cardStyle}>
-            <h2 style={{ marginTop: 0, color: '#00FF88', marginBottom: '20px' }}>Account Growth Over Time</h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={calculateAccountGrowth(trades)}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#3A3A3A" />
-                <XAxis dataKey="date" stroke="#B0B0B0" tickFormatter={(tick) => new Date(tick).toLocaleDateString()} />
-                <YAxis stroke="#B0B0B0" />
-                <Tooltip contentStyle={{ background: '#262626', border: '1px solid #00FF88', borderRadius: '8px' }} />
-                <Line type="monotone" dataKey="cumulative" stroke="#00FF88" strokeWidth={3} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+            {/* CHARTS ROW 1 */}
+            <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr', gap: '20px', marginBottom: '20px' }}>
+              
+              {/* Account Growth Area Chart */}
+              <div style={{ background: COLORS.cardBg, border: `1px solid ${COLORS.border}`, borderRadius: '16px', padding: '20px' }}>
+                <h3 style={{ margin: '0 0 20px 0', fontSize: '1rem', color: COLORS.textBright }}>Equity Curve</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart data={growthData}>
+                    <defs>
+                      <linearGradient id="colorPnL" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={COLORS.green} stopOpacity={0.4} />
+                        <stop offset="95%" stopColor={COLORS.green} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
+                    <XAxis dataKey="trade" stroke={COLORS.textMuted} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis stroke={COLORS.textMuted} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Area type="monotone" dataKey="cumulative" stroke={COLORS.green} strokeWidth={3} fillOpacity={1} fill="url(#colorPnL)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
 
-          <div style={cardStyle}>
-            <h2 style={{ marginTop: 0, color: '#00FF88', marginBottom: '20px' }}>Symbol Performance</h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={symbolData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#3A3A3A" />
-                <XAxis dataKey="symbol" stroke="#B0B0B0" />
-                <YAxis stroke="#B0B0B0" />
-                <Tooltip contentStyle={{ background: '#262626', border: '1px solid #00FF88', borderRadius: '8px' }} />
-                <Bar dataKey="pnl" radius={[8, 8, 0, 0]}>
-                  {symbolData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? '#00FF88' : '#FF3333'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </>
-      ) : (
-        <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginBottom: '20px' }}>
-            <div style={cardStyle}><div style={metricLabelStyle}>Max Drawdown</div><div style={{color: '#FF3333', fontSize: '1.5rem', fontWeight: 'bold'}}><AnimatedNumber value={metrics.maxDrawdown} suffix="%" /></div></div>
-            <div style={cardStyle}><div style={metricLabelStyle}>Biggest Winner</div><div style={{color: '#00FF88', fontSize: '1.5rem', fontWeight: 'bold'}}><AnimatedNumber value={bigWinLoss.biggestWinner} isCurrency /></div></div>
-            <div style={cardStyle}><div style={metricLabelStyle}>Biggest Loser</div><div style={{color: '#FF3333', fontSize: '1.5rem', fontWeight: 'bold'}}><AnimatedNumber value={bigWinLoss.biggestLoser} isCurrency /></div></div>
-            <div style={cardStyle}><div style={metricLabelStyle}>Recovery Factor</div><div style={{color: '#00FF88', fontSize: '1.5rem', fontWeight: 'bold'}}><AnimatedNumber value={recoveryFactor} /></div></div>
-          </div>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginBottom: '20px' }}>
-            <div style={cardStyle}><div style={metricLabelStyle}>Avg Win</div><div style={{color: '#00FF88', fontSize: '1.5rem', fontWeight: 'bold'}}><AnimatedNumber value={metrics.avgWin} isCurrency /></div></div>
-            <div style={cardStyle}><div style={metricLabelStyle}>Avg Loss</div><div style={{color: '#FF3333', fontSize: '1.5rem', fontWeight: 'bold'}}><AnimatedNumber value={metrics.avgLoss} isCurrency /></div></div>
-            <div style={cardStyle}><div style={metricLabelStyle}>Risk/Reward Ratio</div><div style={{color: '#00FF88', fontSize: '1.5rem', fontWeight: 'bold'}}><AnimatedNumber value={(metrics.avgWin && metrics.avgLoss && metrics.avgLoss !== 0) ? (metrics.avgWin / Math.abs(metrics.avgLoss)) : 0} /></div></div>
-            <div style={cardStyle}><div style={metricLabelStyle}>Consistency Score</div><div style={{color: '#00FF88', fontSize: '1.5rem', fontWeight: 'bold'}}><AnimatedNumber value={calculateConsistencyScore(trades)} suffix="%" /></div></div>
-          </div>
+              {/* Win/Loss Donut */}
+              <div style={{ background: COLORS.cardBg, border: `1px solid ${COLORS.border}`, borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column' }}>
+                <h3 style={{ margin: '0 0 10px 0', fontSize: '1rem', color: COLORS.textBright }}>Strike Rate</h3>
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <PieChart>
+                      <Pie data={winLossPieData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none">
+                        <Cell fill={COLORS.green} />
+                        <Cell fill={COLORS.red} />
+                      </Pie>
+                      <Tooltip contentStyle={{ background: '#191919', border: 'none', borderRadius: '8px' }} itemStyle={{ color: '#FFF' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginTop: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: 10, height: 10, borderRadius: '50%', background: COLORS.green }} /> <span style={{ fontSize: '0.8rem', color: COLORS.textMuted }}>Wins</span></div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: 10, height: 10, borderRadius: '50%', background: COLORS.red }} /> <span style={{ fontSize: '0.8rem', color: COLORS.textMuted }}>Losses</span></div>
+                </div>
+              </div>
 
-          <div style={cardStyle}>
-            <h2 style={{ marginTop: 0, color: '#00FF88', marginBottom: '20px' }}>Drawdown Over Time</h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={calculateDrawdownOverTime(trades)}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#3A3A3A" />
-                <XAxis dataKey="date" stroke="#B0B0B0" tickFormatter={(tick) => new Date(tick).toLocaleDateString()} />
-                <YAxis stroke="#B0B0B0" />
-                <Tooltip contentStyle={{ background: '#262626', border: '1px solid #FF3333', borderRadius: '8px' }} />
-                <Area type="monotone" dataKey="drawdown" stroke="#FF3333" fill="#FF3333" fillOpacity={0.2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </>
-      )}
-    </div>
+            </div>
+
+            {/* CHARTS ROW 2 */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              
+              {/* Playbook Edge Matrix */}
+              <div style={{ background: COLORS.cardBg, border: `1px solid ${COLORS.border}`, borderRadius: '16px', padding: '20px' }}>
+                <h3 style={{ margin: '0 0 20px 0', fontSize: '1rem', color: COLORS.textBright }}>Playbook Edge Matrix (By Setup)</h3>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={modelData} layout="vertical" margin={{ left: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" horizontal={false} />
+                    <XAxis type="number" stroke={COLORS.textMuted} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis dataKey="model" type="category" stroke={COLORS.textBright} tick={{ fontSize: 11, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
+                    <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} content={<CustomTooltip />} />
+                    <Bar dataKey="pnl" radius={[0, 4, 4, 0]} barSize={24}>
+                      {modelData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? COLORS.green : COLORS.red} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Asset Performance */}
+              <div style={{ background: COLORS.cardBg, border: `1px solid ${COLORS.border}`, borderRadius: '16px', padding: '20px' }}>
+                <h3 style={{ margin: '0 0 20px 0', fontSize: '1rem', color: COLORS.textBright }}>Asset Performance</h3>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={symbolData} barSize={40}>
+                    <defs>
+                      <linearGradient id="barGreen" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={COLORS.green} /><stop offset="100%" stopColor={COLORS.darkGreen} /></linearGradient>
+                      <linearGradient id="barRed" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={COLORS.red} /><stop offset="100%" stopColor={COLORS.darkRed} /></linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
+                    <XAxis dataKey="symbol" stroke={COLORS.textMuted} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis stroke={COLORS.textMuted} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} content={<CustomTooltip />} />
+                    <Bar dataKey="pnl" radius={[6, 6, 0, 0]}>
+                      {symbolData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? 'url(#barGreen)' : 'url(#barRed)'} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+            </div>
+          </motion.div>
+        )}
+
+
+        {/* =========================================
+                    RISK TAB
+        ========================================= */}
+        {activeTab === 'risk' && (
+          <motion.div key="risk" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+            
+            {/* TOP RISK METRICS */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', marginBottom: '20px' }}>
+              {[
+                { label: 'Max Drawdown', val: metrics.maxDrawdown, suffix: '%', c: COLORS.red },
+                { label: 'Average Win', val: metrics.avgWin, prefix: '$', c: COLORS.green },
+                { label: 'Average Loss', val: metrics.avgLoss, prefix: '$', c: COLORS.red },
+                { label: 'Risk/Reward Ratio', val: metrics.avgLoss == 0 ? 0 : Math.abs(metrics.avgWin / metrics.avgLoss).toFixed(2), suffix: 'R', c: '#2D9CDB' }
+              ].map((m, i) => (
+                <div key={i} style={{ background: COLORS.cardBg, border: `1px solid ${COLORS.border}`, borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <span style={{ color: COLORS.textMuted, fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px', marginBottom: '8px' }}>{m.label}</span>
+                  <span style={{ color: m.c, fontSize: '2.2rem', fontWeight: 800, fontFamily: 'JetBrains Mono, monospace' }}>{m.prefix || ''}{m.val}{m.suffix || ''}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Drawdown Mountain Chart */}
+            <div style={{ background: COLORS.cardBg, border: `1px solid ${COLORS.border}`, borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
+              <h3 style={{ margin: '0 0 20px 0', fontSize: '1rem', color: COLORS.textBright }}>Drawdown Mountain (Peak-to-Valley Drop)</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={drawdownData}>
+                  <defs>
+                    <linearGradient id="colorDD" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={COLORS.red} stopOpacity={0.4} />
+                      <stop offset="95%" stopColor={COLORS.red} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
+                  <XAxis dataKey="trade" stroke={COLORS.textMuted} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis stroke={COLORS.textMuted} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} reversed={true} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Area type="monotone" dataKey="drawdown" stroke={COLORS.red} strokeWidth={3} fillOpacity={1} fill="url(#colorDD)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Long vs Short Matrix */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px' }}>
+              <div style={{ background: COLORS.cardBg, border: `1px solid ${COLORS.border}`, borderRadius: '16px', padding: '20px' }}>
+                <h3 style={{ margin: '0 0 20px 0', fontSize: '1rem', color: COLORS.textBright }}>Long vs Short Matrix</h3>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={directionData} barSize={50}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
+                    <XAxis dataKey="name" stroke={COLORS.textMuted} tick={{ fontSize: 11, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
+                    <YAxis stroke={COLORS.textMuted} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} content={<CustomTooltip />} />
+                    <Bar dataKey="pnl" radius={[6, 6, 0, 0]}>
+                      {directionData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? COLORS.green : COLORS.red} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* R:R Scatter Map */}
+              <div style={{ background: COLORS.cardBg, border: `1px solid ${COLORS.border}`, borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+                <div style={{ color: COLORS.textMuted, textAlign: 'center', maxWidth: '80%' }}>
+                  <h3 style={{ margin: '0 0 10px 0', fontSize: '1rem', color: COLORS.textBright }}>Trade Distribution Warning</h3>
+                  <p style={{ lineHeight: '1.6' }}>If your Max Drawdown exceeds 20%, or if your Average Loss is larger than your Average Win, your risk profile is unstable. Ensure your Stop Loss is logged accurately in the Trades DB to unlock Scatter Mapping in the future updates.</p>
+                </div>
+              </div>
+            </div>
+
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+    </motion.div>
   );
 };
 
