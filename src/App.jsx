@@ -14,7 +14,6 @@ import './App.css';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-// Animated number counter
 const AnimatedNumber = ({ value, prefix = '', suffix = '', decimals = 2 }) => {
   const [display, setDisplay] = useState(0);
   
@@ -43,7 +42,6 @@ const AnimatedNumber = ({ value, prefix = '', suffix = '', decimals = 2 }) => {
   return <span>{prefix}{display.toFixed(decimals)}{suffix}</span>;
 };
 
-// Magnetic card component
 const MagneticCard = ({ children, style, className, ...props }) => {
   const ref = useRef(null);
   const x = useMotionValue(0);
@@ -80,6 +78,8 @@ const MagneticCard = ({ children, style, className, ...props }) => {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // 🟢 NEW: Sidebar State
+  
   const [trades, setTrades] = useState([]);
   const [missedTrades, setMissedTrades] = useState([]);
   const [playbooks, setPlaybooks] = useState([]); 
@@ -271,7 +271,6 @@ export default function App() {
     }
   };
 
-  // 🟢 NEW: Premium Sidebar Categorized Navigation
   const sidebarGroups = [
     {
       category: 'Overview',
@@ -454,103 +453,146 @@ export default function App() {
       <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse 80% 50% at 20% -10%, rgba(0,255,136,0.06) 0%, transparent 60%), radial-gradient(ellipse 60% 40% at 80% 110%, rgba(59,130,246,0.05) 0%, transparent 60%), radial-gradient(ellipse 40% 30% at 50% 50%, rgba(139,92,246,0.03) 0%, transparent 70%)' }} />
       <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0, pointerEvents: 'none', opacity: 0.03, backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")` }} />
 
-      {/* 🟢 NEW: PREMIUM LEFT SIDEBAR NAVIGATION */}
-      <div style={{
-        width: '260px',
-        background: 'rgba(10, 14, 23, 0.95)',
-        borderRight: '1px solid rgba(255,255,255,0.05)',
-        display: 'flex',
-        flexDirection: 'column',
-        zIndex: 20,
-        backdropFilter: 'blur(20px)'
-      }}>
-        
-        {/* Logo Section */}
-        <div style={{ height: '70px', display: 'flex', alignItems: 'center', padding: '0 24px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-          <svg width="24" height="24" viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: '12px' }}>
-            <defs>
-              <linearGradient id="hboltG" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#00FF88" />
-                <stop offset="100%" stopColor="#0088FF" />
-              </linearGradient>
-            </defs>
-            <polygon points="62,0 28,55 48,55 18,110 82,50 55,50 72,0" fill="url(#hboltG)" />
-          </svg>
-          <span style={{ fontSize: '1.2rem', fontWeight: 800, letterSpacing: '-0.02em', background: 'linear-gradient(135deg, #ffffff 0%, #00FF88 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
-            Journal Pro
-          </span>
-        </div>
-
-        {/* Navigation Groups */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 16px' }}>
-          {sidebarGroups.map(group => (
-            <div key={group.category} style={{ marginBottom: '32px' }}>
-              <div style={{ fontSize: '0.65rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, padding: '0 12px', marginBottom: '12px' }}>
-                {group.category}
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {group.items.map(item => {
-                  const isActive = activeTab === item.value;
-                  return (
-                    <motion.button
-                      key={item.value}
-                      onClick={() => setActiveTab(item.value)}
-                      whileHover={{ x: 4 }}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '12px',
-                        padding: '10px 12px', background: isActive ? 'rgba(0, 255, 136, 0.08)' : 'transparent',
-                        border: 'none', borderRadius: '8px', cursor: 'pointer',
-                        color: isActive ? '#00FF88' : '#9CA3AF',
-                        fontWeight: isActive ? 600 : 500, fontSize: '0.9rem',
-                        transition: 'background 0.2s, color 0.2s',
-                        textAlign: 'left'
-                      }}
-                    >
-                      <span style={{ fontSize: '1.1rem', opacity: isActive ? 1 : 0.6 }}>{item.icon}</span>
-                      {item.label}
-                    </motion.button>
-                  )
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* User / Logout Profile Section */}
-        <div style={{ padding: '20px 16px', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
-          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '16px' }}>
-            <div style={{ fontSize: '0.7rem', color: '#9CA3AF', marginBottom: '4px' }}>Logged in as</div>
-            <div style={{ fontSize: '0.85rem', color: '#FFF', fontWeight: 600, wordBreak: 'break-all', marginBottom: '16px' }}>
-              {user?.email || 'Trader'}
-            </div>
-            <button
-              onClick={handleLogout}
+      {/* 🟢 NEW: SLIDING SIDEBAR & BACKDROP */}
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <>
+            {/* Dark Blur Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSidebarOpen(false)}
               style={{
-                width: '100%', background: 'rgba(235, 87, 87, 0.1)', border: '1px solid rgba(235, 87, 87, 0.2)',
-                color: '#EB5757', padding: '8px 0', borderRadius: '6px', cursor: 'pointer',
-                fontSize: '0.85rem', fontWeight: 600, transition: 'all 0.2s'
+                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+                zIndex: 40, cursor: 'pointer'
               }}
-              onMouseEnter={e => e.target.style.background = 'rgba(235, 87, 87, 0.2)'}
-              onMouseLeave={e => e.target.style.background = 'rgba(235, 87, 87, 0.1)'}
+            />
+            
+            {/* Sliding Sidebar Panel */}
+            <motion.div
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
+              style={{
+                position: 'fixed', top: 0, left: 0, bottom: 0, width: '280px',
+                background: 'rgba(10, 14, 23, 0.98)', borderRight: '1px solid rgba(255,255,255,0.05)',
+                zIndex: 50, display: 'flex', flexDirection: 'column',
+                boxShadow: '20px 0 50px rgba(0,0,0,0.5)'
+              }}
             >
-              Logout safely
-            </button>
-          </div>
-        </div>
-      </div>
+              <div style={{ height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <svg width="24" height="24" viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: '12px' }}>
+                    <defs>
+                      <linearGradient id="hboltG2" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#00FF88" />
+                        <stop offset="100%" stopColor="#0088FF" />
+                      </linearGradient>
+                    </defs>
+                    <polygon points="62,0 28,55 48,55 18,110 82,50 55,50 72,0" fill="url(#hboltG2)" />
+                  </svg>
+                  <span style={{ fontSize: '1.2rem', fontWeight: 800, letterSpacing: '-0.02em', background: 'linear-gradient(135deg, #ffffff 0%, #00FF88 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+                    Journal Pro
+                  </span>
+                </div>
+                {/* Close Button Inside Menu */}
+                <button onClick={() => setIsSidebarOpen(false)} style={{ background: 'transparent', border: 'none', color: '#9CA3AF', cursor: 'pointer', padding: '4px' }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+              </div>
 
-      {/* 🟢 MAIN CONTENT AREA */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '24px 16px' }}>
+                {sidebarGroups.map(group => (
+                  <div key={group.category} style={{ marginBottom: '32px' }}>
+                    <div style={{ fontSize: '0.65rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, padding: '0 12px', marginBottom: '12px' }}>
+                      {group.category}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {group.items.map(item => {
+                        const isActive = activeTab === item.value;
+                        return (
+                          <motion.button
+                            key={item.value}
+                            onClick={() => { setActiveTab(item.value); setIsSidebarOpen(false); }}
+                            whileHover={{ x: 4 }}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '12px',
+                              padding: '10px 12px', background: isActive ? 'rgba(0, 255, 136, 0.08)' : 'transparent',
+                              border: 'none', borderRadius: '8px', cursor: 'pointer',
+                              color: isActive ? '#00FF88' : '#9CA3AF',
+                              fontWeight: isActive ? 600 : 500, fontSize: '0.9rem',
+                              transition: 'background 0.2s, color 0.2s', textAlign: 'left'
+                            }}
+                          >
+                            <span style={{ fontSize: '1.1rem', opacity: isActive ? 1 : 0.6 }}>{item.icon}</span>
+                            {item.label}
+                          </motion.button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* MAIN CONTENT AREA */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
         
-        {/* Dynamic Top Header based on active tab */}
-        <header style={{ height: '70px', display: 'flex', alignItems: 'center', padding: '0 40px', borderBottom: '1px solid rgba(255,255,255,0.03)', zIndex: 10, background: 'rgba(8,11,20,0.6)', backdropFilter: 'blur(10px)' }}>
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 600, color: '#FFF', margin: 0, textTransform: 'capitalize' }}>
-            {activeTab.replace(/([A-Z])/g, ' $1').trim()}
-          </h2>
+        {/* 🟢 NEW: REDESIGNED HEADER */}
+        <header style={{ 
+          height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
+          padding: '0 24px', borderBottom: '1px solid rgba(255,255,255,0.03)', zIndex: 10, 
+          background: 'rgba(8,11,20,0.6)', backdropFilter: 'blur(10px)' 
+        }}>
+          {/* Left Side: Hamburger + Active Tab Title */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+            <button 
+              onClick={() => setIsSidebarOpen(true)} 
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#FFF', cursor: 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: '0.2s' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 600, color: '#FFF', margin: 0, textTransform: 'capitalize' }}>
+                {activeTab.replace(/([A-Z])/g, ' $1').trim()}
+              </h2>
+            </div>
+          </div>
+
+          {/* Right Side: Profile & Logout */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,255,136,0.06)', border: '1px solid rgba(0,255,136,0.15)', borderRadius: '8px', padding: '6px 12px' }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#00FF88', boxShadow: '0 0 6px #00FF88' }} />
+              <span style={{ color: '#00FF88', fontWeight: 600, fontSize: '0.85rem', fontFamily: 'JetBrains Mono, monospace' }}>
+                {user?.email || 'User'}
+              </span>
+            </div>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleLogout}
+              style={{
+                background: 'rgba(255,51,51,0.08)', border: '1px solid rgba(255,51,51,0.25)',
+                color: '#FF5555', padding: '6px 14px', borderRadius: '8px',
+                cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600,
+                transition: 'all 0.2s', fontFamily: 'Inter, sans-serif'
+              }}
+            >
+              Logout
+            </motion.button>
+          </div>
         </header>
 
         {/* Scrollable Content Container */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '40px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '30px 40px' }}>
           <AnimatePresence mode="wait">
             {activeTab === 'home' ? (
               <motion.div
