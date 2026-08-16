@@ -15,7 +15,7 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateT
     stopLoss: '',
     exitPrice: '',
     playbookId: '',
-    model: '', // 🟢 FIXED: Brought this back so you can type manually
+    model: '',
     profitLoss: 0,
     followedPlan: true,
     be: false,
@@ -59,7 +59,7 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateT
       stopLoss: trade.stopLoss === 0 ? '' : trade.stopLoss,
       exitPrice: trade.exitPrice === 0 ? '' : trade.exitPrice,
       playbookId: trade.playbookId || '',
-      model: trade.playbookId ? '' : trade.model, // Load custom model if it exists
+      model: trade.playbookId ? '' : trade.model, 
       profitLoss: trade.profitLoss,
       followedPlan: trade.followedPlan !== false,
       be: trade.be || false,
@@ -77,7 +77,6 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateT
     e.preventDefault();
     const dateObj = new Date(formData.date);
     
-    // Resolve Playbook Model Name
     const selectedPb = playbooks.find(p => p.id === parseInt(formData.playbookId));
     const finalModelName = selectedPb ? selectedPb.name : formData.model;
 
@@ -98,7 +97,7 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateT
       followedPlan: formData.followedPlan,
       be: formData.be,
       entryWindow: formData.entryWindow,
-      model: finalModelName, // Uses Custom Model if Playbook isn't selected
+      model: finalModelName, 
       playbookId: formData.playbookId ? parseInt(formData.playbookId) : null,
       positiveTags: formData.positiveTags.split(',').map(t => t.trim()).filter(t => t),
       negativeTags: formData.negativeTags.split(',').map(t => t.trim()).filter(t => t),
@@ -266,7 +265,6 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateT
                 </select>
               </div>
 
-              {/* 🟢 FIXED: If they didn't pick a playbook, let them type a custom model name */}
               {!formData.playbookId && (
                 <div style={styles.inputGroup}>
                   <label style={styles.label}>Custom Model Name</label>
@@ -316,12 +314,14 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateT
               <th style={styles.th}>📈 Pairs</th>
               <th style={styles.th}>⏳ Session</th>
               <th style={styles.th}>↕️ Direction</th>
+              
               <th style={styles.th}>🎯 Entry</th>
               <th style={styles.th}>🛡️ SL</th>
               <th style={styles.th}>🏁 Exit</th>
               <th style={styles.th}>⚖️ R:R</th>
               <th style={styles.th}>💵 P/L</th>
               <th style={styles.th}>🎯 Model</th>
+
               <th style={styles.th}>☑️ Plan</th>
               <th style={styles.th}>☑️ BE</th>
               <th style={styles.th}>🕒 Window</th>
@@ -348,13 +348,20 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateT
                   <td style={styles.td}><strong>{trade.symbol}</strong></td>
                   <td style={styles.td}><span style={styles.pill(trade.session || 'New York')}>{trade.session || 'N/A'}</span></td>
                   <td style={styles.td}><span style={styles.pill(trade.direction || (trade.profitLoss > 0 ? 'LONG' : 'SHORT'))}>{trade.direction || '-'}</span></td>
-                  <td style={styles.td}>{trade.entryPrice === 0 ? '-' : trade.entryPrice}</td>
-                  <td style={styles.td}>{trade.stopLoss === 0 ? '-' : trade.stopLoss}</td>
-                  <td style={styles.td}>{trade.exitPrice === 0 ? '-' : trade.exitPrice}</td>
-                  <td style={{...styles.td, color: trade.riskReward >= 0 ? '#219653' : '#EB5757', fontWeight: 'bold'}}>{trade.riskReward ? `${trade.riskReward}R` : '-'}</td>
-                  <td style={{...styles.td, color: trade.profitLoss > 0 ? '#219653' : '#EB5757', fontWeight: 'bold'}}>${trade.profitLoss}</td>
                   
-                  {/* Model column logic */}
+                  {/* 🟢 FIXED: Properly handles rendering of 0 values */}
+                  <td style={styles.td}>{trade.entryPrice !== 0 ? trade.entryPrice : '-'}</td>
+                  <td style={styles.td}>{trade.stopLoss !== 0 ? trade.stopLoss : '-'}</td>
+                  <td style={styles.td}>{trade.exitPrice !== 0 ? trade.exitPrice : '-'}</td>
+                  
+                  <td style={{...styles.td, color: trade.riskReward > 0 ? '#219653' : trade.riskReward < 0 ? '#EB5757' : '#9B9A97', fontWeight: 'bold'}}>
+                    {trade.riskReward !== 0 ? `${trade.riskReward}R` : '-'}
+                  </td>
+
+                  <td style={{...styles.td, color: trade.profitLoss > 0 ? '#219653' : '#EB5757', fontWeight: 'bold'}}>
+                    ${trade.profitLoss}
+                  </td>
+                  
                   <td style={styles.td}><span style={styles.pill('Model')}>{trade.model || 'Manual'}</span></td>
 
                   <td style={styles.td}><input type="checkbox" checked={trade.followedPlan !== false} readOnly style={styles.checkbox}/></td>
@@ -365,6 +372,7 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateT
                   <td style={styles.td}><span style={styles.pill(trade.account || 'Account1')}>{trade.account || '-'}</span></td>
                   <td style={{...styles.td, color: '#F2C94C', letterSpacing: '2px'}}>{renderStars(trade.rating)}</td>
                   <td style={styles.td}><input type="checkbox" checked={trade.win || trade.profitLoss > 0} readOnly style={styles.checkbox}/></td>
+                  
                   <td style={styles.td}>
                     <button style={styles.editBtn} onClick={() => handleEditClick(trade)}>Edit</button>
                     <button style={styles.deleteBtn} onClick={() => onDeleteTrade(trade.id)}>Delete</button>

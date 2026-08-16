@@ -6,7 +6,7 @@ import bcrypt from 'bcryptjs';
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '50mb' })); // 🟢 NEW: Increased limit to accept image files
+app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 const JWT_SECRET = process.env.JWT_SECRET || 'TRADING_JWT_SECRET_2024';
@@ -37,15 +37,12 @@ pool.query(`
     password VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )
-`).then(() => console.log('✅ Users table ready'))
-  .catch(err => console.error('❌ Users table error:', err.message));
+`).then(() => console.log('✅ Users table ready'));
 
 pool.query(`
   ALTER TABLE trades ADD COLUMN IF NOT EXISTS user_id INT
-`).then(() => console.log('✅ user_id column ready in trades'))
-  .catch(() => console.log('ℹ️ user_id column already exists in trades'));
+`).then(() => console.log('✅ user_id column ready in trades')).catch(() => {});
 
-// Auto-Create Missed Trades Table with user_id attached
 pool.query(`
   CREATE TABLE IF NOT EXISTS missed_trades (
     id INT PRIMARY KEY AUTO_INCREMENT,
@@ -73,7 +70,6 @@ pool.query(`
   )
 `).then(() => console.log('✅ Playbooks table ready'));
 
-// 🟢 FIXED: Changed image_url to LONGTEXT so it can save actual Image Files
 pool.query(`
   CREATE TABLE IF NOT EXISTS chart_gallery (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -87,25 +83,21 @@ pool.query(`
     lessons TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )
-`).then(() => {
-  console.log('✅ Chart Gallery table ready');
-  // Alter it just in case it was already created as VARCHAR previously
-  pool.query(`ALTER TABLE chart_gallery MODIFY COLUMN image_url LONGTEXT NOT NULL`).catch(() => {});
-}).catch(err => console.error('❌ Chart Gallery table error:', err.message));
+`).then(() => console.log('✅ Chart Gallery table ready'));
 
-
+// 🟢 FIXED: Bulletproof column addition for all MySQL versions
 async function updateTradesTable() {
-  try {
-    await pool.query("ALTER TABLE trades ADD COLUMN IF NOT EXISTS stop_loss DECIMAL(15,4) DEFAULT 0");
-    await pool.query("ALTER TABLE trades ADD COLUMN IF NOT EXISTS risk_reward DECIMAL(10,2) DEFAULT 0");
-    await pool.query("ALTER TABLE trades ADD COLUMN IF NOT EXISTS playbook_id INT DEFAULT NULL");
-    console.log('✅ Trades table advanced columns ready');
-  } catch (e) {
-    console.log('ℹ️ Trades table columns check complete');
+  const queries = [
+    "ALTER TABLE trades ADD COLUMN stop_loss DECIMAL(15,4) DEFAULT 0",
+    "ALTER TABLE trades ADD COLUMN risk_reward DECIMAL(10,2) DEFAULT 0",
+    "ALTER TABLE trades ADD COLUMN playbook_id INT DEFAULT NULL"
+  ];
+  for (let query of queries) {
+    try { await pool.query(query); } catch (e) { /* Column already exists, safe to ignore */ }
   }
+  console.log('✅ Trades table advanced columns ready');
 }
 updateTradesTable();
-
 
 // JWT MIDDLEWARE
 const verifyToken = (req, res, next) => {
@@ -226,6 +218,7 @@ app.get('/api/trades', verifyToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// 🟢 FIXED: Properly saves stop_loss, risk_reward, and playbook_id into MySQL
 app.post('/api/trades', verifyToken, async (req, res) => {
   const {
     symbol, entryPrice, exitPrice, stopLoss, profitLoss, riskReward, playbookId, 
@@ -263,6 +256,7 @@ app.delete('/api/trades/:id', verifyToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// 🟢 FIXED: Properly updates stop_loss, risk_reward, and playbook_id into MySQL
 app.put('/api/trades/:id', verifyToken, async (req, res) => {
   const { symbol, entryPrice, exitPrice, stopLoss, profitLoss, riskReward, playbookId, entryTime, session, direction, followedPlan, rating, mistakes, wentRight, entryWindow, model, positiveTags, negativeTags, account, be } = req.body;
   let mysqlEntryTime;
