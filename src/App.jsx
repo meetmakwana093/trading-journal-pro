@@ -78,7 +78,7 @@ const MagneticCard = ({ children, style, className, ...props }) => {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // 🟢 NEW: Sidebar State
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
   
   const [trades, setTrades] = useState([]);
   const [missedTrades, setMissedTrades] = useState([]);
@@ -338,17 +338,6 @@ export default function App() {
     };
   };
 
-  const calculateSymbolPerformance = (trades) => {
-    const symbols = [...new Set(trades.map(t => t.symbol))];
-    const performance = {};
-    symbols.forEach(symbol => {
-      const symbolTrades = trades.filter(t => t.symbol === symbol);
-      const total = symbolTrades.reduce((sum, t) => sum + t.profitLoss, 0);
-      performance[symbol] = parseFloat(total.toFixed(2));
-    });
-    return performance;
-  };
-
   const calculateAccountGrowth = (trades) => {
     const sortedTrades = [...trades].sort((a, b) => new Date(a.entryTime) - new Date(b.entryTime));
     let cumulative = 0;
@@ -406,8 +395,9 @@ export default function App() {
     return calendarData;
   };
 
+  // 🟢 FIXED: Added Saturday and Sunday explicitly to the Day of Week Chart
   const calculateDOWPerformance = (trades) => {
-    const dow = { 'Mon': 0, 'Tue': 0, 'Wed': 0, 'Thu': 0, 'Fri': 0 };
+    const dow = { 'Mon': 0, 'Tue': 0, 'Wed': 0, 'Thu': 0, 'Fri': 0, 'Sat': 0, 'Sun': 0 };
     trades.forEach(t => {
       if (t.entryTime) {
         const d = new Date(t.entryTime);
@@ -420,7 +410,6 @@ export default function App() {
 
   const metrics = calculateMetrics(trades);
   const calendarData = getCalendarData(trades);
-  const symbolData = Object.entries(calculateSymbolPerformance(trades)).map(([symbol, pnl]) => ({ symbol, pnl }));
   const dowData = calculateDOWPerformance(trades);
 
   const currentMonth = calendarMonth;
@@ -453,11 +442,10 @@ export default function App() {
       <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse 80% 50% at 20% -10%, rgba(0,255,136,0.06) 0%, transparent 60%), radial-gradient(ellipse 60% 40% at 80% 110%, rgba(59,130,246,0.05) 0%, transparent 60%), radial-gradient(ellipse 40% 30% at 50% 50%, rgba(139,92,246,0.03) 0%, transparent 70%)' }} />
       <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0, pointerEvents: 'none', opacity: 0.03, backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")` }} />
 
-      {/* 🟢 NEW: SLIDING SIDEBAR & BACKDROP */}
+      {/* SLIDING SIDEBAR & BACKDROP */}
       <AnimatePresence>
         {isSidebarOpen && (
           <>
-            {/* Dark Blur Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -470,7 +458,6 @@ export default function App() {
               }}
             />
             
-            {/* Sliding Sidebar Panel */}
             <motion.div
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
@@ -498,7 +485,6 @@ export default function App() {
                     Journal Pro
                   </span>
                 </div>
-                {/* Close Button Inside Menu */}
                 <button onClick={() => setIsSidebarOpen(false)} style={{ background: 'transparent', border: 'none', color: '#9CA3AF', cursor: 'pointer', padding: '4px' }}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </button>
@@ -544,13 +530,12 @@ export default function App() {
       {/* MAIN CONTENT AREA */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
         
-        {/* 🟢 NEW: REDESIGNED HEADER */}
+        {/* HEADER */}
         <header style={{ 
           height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
           padding: '0 24px', borderBottom: '1px solid rgba(255,255,255,0.03)', zIndex: 10, 
           background: 'rgba(8,11,20,0.6)', backdropFilter: 'blur(10px)' 
         }}>
-          {/* Left Side: Hamburger + Active Tab Title */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
             <button 
               onClick={() => setIsSidebarOpen(true)} 
@@ -567,7 +552,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Right Side: Profile & Logout */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,255,136,0.06)', border: '1px solid rgba(0,255,136,0.15)', borderRadius: '8px', padding: '6px 12px' }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#00FF88', boxShadow: '0 0 6px #00FF88' }} />
@@ -615,16 +599,21 @@ export default function App() {
                       </ResponsiveContainer>
                     </MagneticCard>
 
+                    {/* 🟢 FIXED: Day of Week Chart now has Gradient Fills and includes Sat/Sun */}
                     <MagneticCard style={{ background: 'rgba(13,17,28,0.9)', border: '1px solid rgba(0,255,136,0.12)', borderRadius: '16px', padding: '20px', boxShadow: '0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
                       <h3 style={{ color: 'rgba(255,255,255,0.7)', margin: '0 0 15px 0', fontSize: '0.8rem', textAlign: 'center', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Day of Week</h3>
                       <ResponsiveContainer width="100%" height={230}>
-                        <BarChart data={dowData} barSize={28}>
+                        <BarChart data={dowData} barSize={22}>
+                          <defs>
+                            <linearGradient id="dowGreen" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#00FF88" stopOpacity={1}/><stop offset="100%" stopColor="#00B35F" stopOpacity={0.8}/></linearGradient>
+                            <linearGradient id="dowRed" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#FF3333" stopOpacity={1}/><stop offset="100%" stopColor="#B32424" stopOpacity={0.8}/></linearGradient>
+                          </defs>
                           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                          <XAxis dataKey="day" stroke="rgba(255,255,255,0.3)" tick={{ fontSize: 11 }} />
-                          <YAxis stroke="rgba(255,255,255,0.3)" tick={{ fontSize: 10 }} />
-                          <Tooltip contentStyle={{ background: '#0D111C', border: '1px solid rgba(0,255,136,0.2)', borderRadius: '8px', fontSize: '0.8rem' }} />
-                          <Bar dataKey="pnl" radius={[6, 6, 0, 0]}>
-                            {dowData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? '#00FF88' : '#FF3333'} fillOpacity={0.85} />)}
+                          <XAxis dataKey="day" stroke="rgba(255,255,255,0.3)" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                          <YAxis stroke="rgba(255,255,255,0.3)" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                          <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} contentStyle={{ background: '#0D111C', border: '1px solid rgba(0,255,136,0.2)', borderRadius: '8px', fontSize: '0.8rem' }} />
+                          <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
+                            {dowData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? 'url(#dowGreen)' : 'url(#dowRed)'} />)}
                           </Bar>
                         </BarChart>
                       </ResponsiveContainer>
@@ -663,43 +652,37 @@ export default function App() {
                       ))}
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
-                      {[
-                        { title: 'Account Growth', chart: 'line' },
-                        { title: 'Symbol Performance', chart: 'bar' }
-                      ].map((item, i) => (
-                        <MagneticCard key={item.title} style={{ background: 'rgba(13,17,28,0.95)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '20px', boxShadow: '0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
-                          <h3 style={{ color: 'rgba(255,255,255,0.6)', margin: '0 0 14px 0', fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{item.title}</h3>
-                          <ResponsiveContainer width="100%" height={220}>
-                            {item.chart === 'line' ? (
-                              <LineChart data={calculateAccountGrowth(trades)}>
-                                <defs>
-                                  <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#00FF88" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="#00FF88" stopOpacity={0} />
-                                  </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                                <XAxis dataKey="trade" stroke="rgba(255,255,255,0.25)" tick={{ fontSize: 10 }} />
-                                <YAxis stroke="rgba(255,255,255,0.25)" tick={{ fontSize: 10 }} />
-                                <Tooltip contentStyle={{ background: '#0D111C', border: '1px solid rgba(0,255,136,0.2)', borderRadius: '8px', fontSize: '0.8rem' }} />
-                                <Line type="monotone" dataKey="cumulative" stroke="#00FF88" strokeWidth={2.5} dot={false} />
-                              </LineChart>
-                            ) : (
-                              <BarChart data={symbolData}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                                <XAxis dataKey="symbol" stroke="rgba(255,255,255,0.25)" tick={{ fontSize: 10 }} />
-                                <YAxis stroke="rgba(255,255,255,0.25)" tick={{ fontSize: 10 }} />
-                                <Tooltip contentStyle={{ background: '#0D111C', border: '1px solid rgba(0,255,136,0.2)', borderRadius: '8px', fontSize: '0.8rem' }} />
-                                <Bar dataKey="pnl" radius={[6, 6, 0, 0]}>
-                                  {symbolData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? '#00FF88' : '#FF3333'} fillOpacity={0.85} />)}
-                                </Bar>
-                              </BarChart>
-                            )}
-                          </ResponsiveContainer>
-                        </MagneticCard>
-                      ))}
-                    </div>
+                    {/* 🟢 FIXED: Removed Symbol Performance and Expanded Account Growth */}
+                    <MagneticCard style={{ background: 'rgba(13,17,28,0.95)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '24px', boxShadow: '0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)', marginBottom: '24px' }}>
+                      <h3 style={{ color: 'rgba(255,255,255,0.6)', margin: '0 0 14px 0', fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                        Account Growth Pipeline
+                      </h3>
+                      <ResponsiveContainer width="100%" height={260}>
+                        <AreaChart data={calculateAccountGrowth(trades)}>
+                          <defs>
+                            <linearGradient id="growthGradFull" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#00FF88" stopOpacity={0.4} />
+                              <stop offset="95%" stopColor="#00FF88" stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                          <XAxis dataKey="trade" stroke="rgba(255,255,255,0.25)" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                          <YAxis stroke="rgba(255,255,255,0.25)" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                          <Tooltip 
+                            contentStyle={{ background: '#0D111C', border: '1px solid rgba(0,255,136,0.2)', borderRadius: '8px', fontSize: '0.8rem', color: '#FFF' }}
+                            itemStyle={{ color: '#00FF88', fontWeight: 'bold' }}
+                          />
+                          <Area 
+                            type="monotone" 
+                            dataKey="cumulative" 
+                            stroke="#00FF88" 
+                            strokeWidth={3} 
+                            fill="url(#growthGradFull)" 
+                            activeDot={{ r: 6, fill: '#00FF88', stroke: '#FFF', strokeWidth: 2 }}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </MagneticCard>
 
                     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} style={{ background: 'rgba(13,17,28,0.95)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '20px', boxShadow: '0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
