@@ -16,13 +16,13 @@ const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const AnimatedNumber = ({ value, prefix = '', suffix = '', decimals = 2 }) => {
   const [display, setDisplay] = useState(0);
-  
+
   useEffect(() => {
     let start = 0;
     const end = parseFloat(value) || 0;
-    if (start === end) { 
-      setDisplay(end); 
-      return; 
+    if (start === end) {
+      setDisplay(end);
+      return;
     }
     const duration = 1000;
     const step = (end - start) / (duration / 16);
@@ -56,10 +56,10 @@ const MagneticCard = ({ children, style, className, ...props }) => {
     x.set((e.clientX - centerX) * 0.08);
     y.set((e.clientY - centerY) * 0.08);
   };
-  
-  const handleMouseLeave = () => { 
-    x.set(0); 
-    y.set(0); 
+
+  const handleMouseLeave = () => {
+    x.set(0);
+    y.set(0);
   };
 
   return (
@@ -83,11 +83,11 @@ const CustomTooltip = ({ active, payload, label }) => {
     const isNegative = val < 0;
     const color = isNegative ? '#FF3333' : '#00FF88';
     return (
-      <div style={{ 
-        background: 'rgba(10, 14, 23, 0.95)', border: `1px solid ${color}`, 
-        padding: '12px 16px', borderRadius: '8px', 
-        boxShadow: `0 8px 24px rgba(0,0,0,0.4), 0 0 12px ${isNegative ? 'rgba(255,51,51,0.2)' : 'rgba(0,255,136,0.2)'}`, 
-        backdropFilter: 'blur(10px)' 
+      <div style={{
+        background: 'rgba(10, 14, 23, 0.95)', border: `1px solid ${color}`,
+        padding: '12px 16px', borderRadius: '8px',
+        boxShadow: `0 8px 24px rgba(0,0,0,0.4), 0 0 12px ${isNegative ? 'rgba(255,51,51,0.2)' : 'rgba(0,255,136,0.2)'}`,
+        backdropFilter: 'blur(10px)'
       }}>
         <p style={{ color: 'rgba(255,255,255,0.6)', margin: '0 0 4px 0', fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px' }}>
           {label}
@@ -103,14 +103,14 @@ const CustomTooltip = ({ active, payload, label }) => {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
-  
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
   const [trades, setTrades] = useState([]);
   const [missedTrades, setMissedTrades] = useState([]);
-  const [playbooks, setPlaybooks] = useState([]); 
-  const [charts, setCharts] = useState([]); 
+  const [playbooks, setPlaybooks] = useState([]);
+  const [charts, setCharts] = useState([]);
   const [user, setUser] = useState(getUser());
-  
+
   const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
 
@@ -125,9 +125,9 @@ export default function App() {
     symbol: data.symbol,
     entryPrice: parseFloat(data.entryPrice !== undefined ? data.entryPrice : data.entry_price) || 0,
     exitPrice: parseFloat(data.exitPrice !== undefined ? data.exitPrice : data.exit_price) || 0,
-    stopLoss: parseFloat(data.stopLoss !== undefined ? data.stopLoss : data.stop_loss) || 0, 
+    stopLoss: parseFloat(data.stopLoss !== undefined ? data.stopLoss : data.stop_loss) || 0,
     profitLoss: parseFloat(data.profitLoss !== undefined ? data.profitLoss : data.profit_loss) || 0,
-    riskReward: parseFloat(data.riskReward !== undefined ? data.riskReward : data.risk_reward) || 0, 
+    riskReward: parseFloat(data.riskReward !== undefined ? data.riskReward : data.risk_reward) || 0,
     entryTime: data.entryTime || data.entry_time,
     session: data.session || '',
     direction: data.direction || '',
@@ -137,7 +137,7 @@ export default function App() {
     wentRight: data.wentRight || data.went_right || '',
     entryWindow: data.entryWindow || data.entry_window || '',
     model: data.model || '',
-    playbookId: data.playbookId || data.playbook_id || null, 
+    playbookId: data.playbookId || data.playbook_id || null,
     positiveTags: parseTags(data.positiveTags || data.positive_tags),
     negativeTags: parseTags(data.negativeTags || data.negative_tags),
     account: data.account || '',
@@ -157,17 +157,17 @@ export default function App() {
 
   useEffect(() => {
     if (!user) return;
-    
+
     fetch(`${API}/trades`, { headers: { 'Authorization': `Bearer ${getToken()}` } })
       .then(res => res.json())
       .then(data => { if (Array.isArray(data)) setTrades(data.map(formatTradeData)); })
       .catch(err => console.error('Failed to fetch trades:', err));
-      
+
     fetch(`${API}/missed-trades`, { headers: { 'Authorization': `Bearer ${getToken()}` } })
       .then(res => res.json())
       .then(data => { if (Array.isArray(data)) setMissedTrades(data.map(formatMissedTradeData)); })
       .catch(err => console.error('Failed to fetch missed trades:', err));
-    
+
     fetch(`${API}/playbooks`, { headers: { 'Authorization': `Bearer ${getToken()}` } })
       .then(res => res.json())
       .then(data => { if (Array.isArray(data)) setPlaybooks(data); })
@@ -186,13 +186,13 @@ export default function App() {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
       body: JSON.stringify(safeTrade)
     })
-      .then(res => { 
-        if (!res.ok) throw new Error(`HTTP Error: ${res.status}`); 
-        return res.json(); 
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+        return res.json();
       })
-      .then(saved => { 
-        if (!saved || !saved.symbol) return; 
-        setTrades((prev) => [formatTradeData(saved), ...prev]); 
+      .then(saved => {
+        if (!saved || !saved.symbol) return;
+        setTrades((prev) => [formatTradeData(saved), ...prev]);
       })
       .catch(() => alert("⚠️ Connection Error: Could not reach the database backend."));
   };
@@ -224,13 +224,13 @@ export default function App() {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
       body: JSON.stringify(newMissedTrade)
     })
-      .then(res => { 
-        if (!res.ok) throw new Error(`HTTP Error: ${res.status}`); 
-        return res.json(); 
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+        return res.json();
       })
-      .then(saved => { 
-        if (!saved || !saved.symbol) return; 
-        setMissedTrades((prev) => [formatMissedTradeData(saved), ...prev]); 
+      .then(saved => {
+        if (!saved || !saved.symbol) return;
+        setMissedTrades((prev) => [formatMissedTradeData(saved), ...prev]);
       })
       .catch(() => alert("⚠️ Connection Error: Could not save missed trade."));
   };
@@ -268,29 +268,29 @@ export default function App() {
   };
 
   const handleLogin = (userData) => setUser(userData);
-  
-  const handleLogout = () => { 
-    logout(); 
-    setUser(null); 
-    setTrades([]); 
-    setMissedTrades([]); 
-    setPlaybooks([]); 
-    setCharts([]); 
+
+  const handleLogout = () => {
+    logout();
+    setUser(null);
+    setTrades([]);
+    setMissedTrades([]);
+    setPlaybooks([]);
+    setCharts([]);
   };
 
   const handlePrevMonth = () => {
-    if (calendarMonth === 0) { 
-      setCalendarMonth(11); 
-      setCalendarYear(y => y - 1); 
+    if (calendarMonth === 0) {
+      setCalendarMonth(11);
+      setCalendarYear(y => y - 1);
     } else {
       setCalendarMonth(m => m - 1);
     }
   };
 
   const handleNextMonth = () => {
-    if (calendarMonth === 11) { 
-      setCalendarMonth(0); 
-      setCalendarYear(y => y + 1); 
+    if (calendarMonth === 11) {
+      setCalendarMonth(0);
+      setCalendarYear(y => y + 1);
     } else {
       setCalendarMonth(m => m + 1);
     }
@@ -338,7 +338,7 @@ export default function App() {
     const grossProfit = winningTrades.reduce((sum, t) => sum + t.profitLoss, 0);
     const grossLoss = Math.abs(losingTrades.reduce((sum, t) => sum + t.profitLoss, 0));
     const profitFactor = grossLoss === 0 ? 0 : grossProfit / grossLoss;
-    
+
     const sortedTrades = [...trades].sort((a, b) => new Date(a.entryTime) - new Date(b.entryTime));
     let cumulative = 0, peak = 0, maxDrawdown = 0;
     sortedTrades.forEach(t => {
@@ -347,10 +347,10 @@ export default function App() {
       const drawdown = peak === 0 ? 0 : ((peak - cumulative) / peak) * 100;
       if (drawdown > maxDrawdown) maxDrawdown = drawdown;
     });
-    
+
     const avgWin = winning === 0 ? 0 : grossProfit / winning;
     const avgLoss = losing === 0 ? 0 : grossLoss / losing;
-    
+
     return {
       winRate: parseFloat(winRate.toFixed(2)),
       totalPnL: parseFloat(totalPnL.toFixed(2)),
@@ -473,7 +473,7 @@ export default function App() {
 
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100vw', background: '#080B14', color: '#FFF', overflow: 'hidden', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif' }}>
-      
+
       {/* BACKGROUND EFFECTS */}
       <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse 80% 50% at 20% -10%, rgba(0,255,136,0.06) 0%, transparent 60%), radial-gradient(ellipse 60% 40% at 80% 110%, rgba(59,130,246,0.05) 0%, transparent 60%), radial-gradient(ellipse 40% 30% at 50% 50%, rgba(139,92,246,0.03) 0%, transparent 70%)' }} />
       <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0, pointerEvents: 'none', opacity: 0.03, backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")` }} />
@@ -493,7 +493,7 @@ export default function App() {
                 zIndex: 40, cursor: 'pointer'
               }}
             />
-            
+
             <motion.div
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
@@ -564,14 +564,14 @@ export default function App() {
       </AnimatePresence>
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
-        <header style={{ 
-          height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
-          padding: '0 24px', borderBottom: '1px solid rgba(255,255,255,0.03)', zIndex: 10, 
-          background: 'rgba(8,11,20,0.6)', backdropFilter: 'blur(10px)' 
+        <header style={{
+          height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '0 24px', borderBottom: '1px solid rgba(255,255,255,0.03)', zIndex: 10,
+          background: 'rgba(8,11,20,0.6)', backdropFilter: 'blur(10px)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-            <button 
-              onClick={() => setIsSidebarOpen(true)} 
+            <button
+              onClick={() => setIsSidebarOpen(true)}
               style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#FFF', cursor: 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: '0.2s' }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
               onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
@@ -626,6 +626,7 @@ export default function App() {
                           <PolarAngleAxis dataKey="subject" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 9 }} />
                           <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
                           <Radar name="Performance" dataKey="A" stroke="#00FF88" fill="#00FF88" fillOpacity={0.15} strokeWidth={2} />
+                          <Tooltip contentStyle={{ background: '#0D111C', border: '1px solid rgba(0,255,136,0.2)', borderRadius: '8px', fontSize: '0.8rem' }} />
                         </RadarChart>
                       </ResponsiveContainer>
                     </MagneticCard>
@@ -635,21 +636,41 @@ export default function App() {
                       <ResponsiveContainer width="100%" height={230}>
                         <BarChart data={dowData} barSize={22}>
                           <defs>
-                            <linearGradient id="dowGreen" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#00FF88" stopOpacity={1}/><stop offset="100%" stopColor="#00B35F" stopOpacity={0.8}/></linearGradient>
-                            <linearGradient id="dowRed" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#FF3333" stopOpacity={1}/><stop offset="100%" stopColor="#B32424" stopOpacity={0.8}/></linearGradient>
+                            <linearGradient id="dowGreen" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#00FF88" stopOpacity={1} /><stop offset="100%" stopColor="#00B35F" stopOpacity={0.8} /></linearGradient>
+                            <linearGradient id="dowRed" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#FF3333" stopOpacity={1} /><stop offset="100%" stopColor="#B32424" stopOpacity={0.8} /></linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
                           <XAxis dataKey="day" stroke="rgba(255,255,255,0.3)" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                           <YAxis stroke="rgba(255,255,255,0.3)" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                          
-                          {/* 🟢 FIXED: Universal Glassmorphism Tooltip added here */}
                           <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} content={<CustomTooltip />} />
-                          
                           <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
                             {dowData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? 'url(#dowGreen)' : 'url(#dowRed)'} />)}
                           </Bar>
                         </BarChart>
                       </ResponsiveContainer>
+                    </MagneticCard>
+
+                    {/* 🟢 NEW: Psychology Bleed Widget */}
+                    <MagneticCard style={{ background: 'rgba(13,17,28,0.95)', border: '1px solid rgba(255,51,51,0.2)', borderRadius: '16px', padding: '20px', boxShadow: '0 4px 24px rgba(255,51,51,0.05), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
+                      <h3 style={{ color: '#FF3333', margin: '0 0 15px 0', fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Psychology Bleed</span>
+                        <span style={{ fontSize: '1rem' }}>🧠</span>
+                      </h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div>
+                          <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', textTransform: 'uppercase', marginBottom: '4px' }}>Cost of Broken Rules</div>
+                          <div style={{ color: '#FF3333', fontSize: '1.6rem', fontWeight: 800, fontFamily: 'JetBrains Mono, monospace' }}>
+                            ${Math.abs(trades.filter(t => !t.followedPlan && t.profitLoss < 0).reduce((sum, t) => sum + t.profitLoss, 0)).toFixed(2)}
+                          </div>
+                        </div>
+                        <div style={{ height: '1px', background: 'rgba(255,255,255,0.05)' }} />
+                        <div>
+                          <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', textTransform: 'uppercase', marginBottom: '4px' }}>Plan Adherence</div>
+                          <div style={{ color: '#FFF', fontSize: '1.2rem', fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>
+                            {trades.length ? ((trades.filter(t => t.followedPlan).length / trades.length) * 100).toFixed(0) : 0}%
+                          </div>
+                        </div>
+                      </div>
                     </MagneticCard>
                   </motion.div>
                 </div>
@@ -705,16 +726,16 @@ export default function App() {
                           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
                           <XAxis dataKey="trade" stroke="rgba(255,255,255,0.25)" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                           <YAxis stroke="rgba(255,255,255,0.25)" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                          
+
                           {/* 🟢 FIXED: Custom Tooltip implemented here */}
                           <Tooltip cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1, strokeDasharray: '3 3' }} content={<CustomTooltip />} />
-                          
-                          <Area 
-                            type="monotone" 
-                            dataKey="cumulative" 
-                            stroke="url(#splitStroke)" 
-                            strokeWidth={3} 
-                            fill="url(#splitColor)" 
+
+                          <Area
+                            type="monotone"
+                            dataKey="cumulative"
+                            stroke="url(#splitStroke)"
+                            strokeWidth={3}
+                            fill="url(#splitColor)"
                             activeDot={{ r: 6, fill: '#191919', stroke: 'url(#splitStroke)', strokeWidth: 2 }}
                           />
                         </AreaChart>
@@ -775,6 +796,32 @@ export default function App() {
                       <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '6px' }}>Total Trades</div>
                       <div style={{ color: '#3b82f6', fontSize: '2rem', fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>{trades.length}</div>
                     </motion.div>
+
+                    {/* 🟢 NEW: Live Execution Feed */}
+                    <MagneticCard style={{ background: 'rgba(13,17,28,0.95)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '14px', padding: '18px', boxShadow: '0 4px 16px rgba(0,0,0,0.3)' }}>
+                      <h3 style={{ color: 'rgba(255,255,255,0.6)', margin: '0 0 12px 0', fontSize: '0.7rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Recent Executions</h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {trades.slice(0, 3).map((t, i) => (
+                          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: t.profitLoss >= 0 ? '#00FF88' : '#FF3333', boxShadow: `0 0 8px ${t.profitLoss >= 0 ? '#00FF88' : '#FF3333'}` }} />
+                              <div>
+                                <div style={{ color: '#FFF', fontSize: '0.85rem', fontWeight: 600 }}>{t.symbol}</div>
+                                <div style={{ color: '#6B7280', fontSize: '0.65rem' }}>{t.model || 'Manual'}</div>
+                              </div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ color: t.profitLoss >= 0 ? '#00FF88' : '#FF3333', fontSize: '0.9rem', fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>
+                                {t.profitLoss >= 0 ? '+' : ''}{formatCurrency(t.profitLoss)}
+                              </div>
+                              <div style={{ color: '#6B7280', fontSize: '0.65rem', fontFamily: 'JetBrains Mono, monospace' }}>{t.riskReward ? `${t.riskReward}R` : '--'}</div>
+                            </div>
+                          </div>
+                        ))}
+                        {trades.length === 0 && <div style={{ color: '#6B7280', fontSize: '0.8rem', textAlign: 'center', padding: '10px 0' }}>No trades logged yet.</div>}
+                      </div>
+                    </MagneticCard>
+
                   </motion.div>
                 </div>
               </motion.div>
