@@ -10,7 +10,17 @@ const DataImport = ({ onBulkTradesImported }) => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [statusMessage, setStatusMessage] = useState(null);
 
-    // 🟢 UPGRADED: Smart Broker CSV Parser
+    // Helper function to fix Indian Broker Date formats (DD-MM-YYYY -> YYYY-MM-DD)
+    const formatBrokerDate = (dateStr) => {
+        if (!dateStr) return new Date().toISOString().split('T')[0];
+        // Checks if it matches DD-MM-YYYY or DD/MM/YYYY
+        if (dateStr.match(/^\d{2}[-/]\d{2}[-/]\d{4}/)) {
+            const parts = dateStr.split(/[-/]/);
+            return `${parts[2]}-${parts[1]}-${parts[0]}`; // Returns YYYY-MM-DD
+        }
+        return dateStr;
+    };
+
     const handleFileUpload = (e) => {
         const file = e.target.files ? e.target.files[0] : null;
         if (!file) return;
@@ -31,40 +41,45 @@ const DataImport = ({ onBulkTradesImported }) => {
                 const lines = text.split(/\r\n|\n/).filter(line => line.trim() !== '');
                 if (lines.length < 2) throw new Error('File is empty or invalid.');
 
-                // 1. SMART SCAN: Hunt for the actual header row (bypassing Groww/Zerodha preambles)
+                // 1. SMART SCAN
                 let headerIdx = -1;
                 for (let i = 0; i < Math.min(lines.length, 20); i++) {
                     const lowerLine = lines[i].toLowerCase();
-                    if (lowerLine.includes('symbol') || lowerLine.includes('instrument') || lowerLine.includes('ticker') || lowerLine.includes('scrip')) {
+                    if (
+                        lowerLine.includes('symbol') || lowerLine.includes('instrument') || 
+                        lowerLine.includes('ticker') || lowerLine.includes('scrip') || 
+                        lowerLine.includes('stock') || lowerLine.includes('security') || 
+                        lowerLine.includes('company')
+                    ) {
                         headerIdx = i;
                         break;
                     }
                 }
 
                 if (headerIdx === -1) {
-                    throw new Error('Could not detect column headers. Make sure your CSV contains a "Symbol" or "Instrument" column.');
+                    throw new Error('Could not detect column headers. Make sure your CSV contains a "Stock name" or "Symbol" column.');
                 }
 
-                // 2. Extract column positions
+                // 2. EXTRACT COLUMNS (Using exactly what your CSV provides)
                 const headers = lines[headerIdx].split(',').map(h => h.trim().toLowerCase().replace(/['"]+/g, ''));
                 
-                const symbolIdx = headers.findIndex(h => h.includes('symbol') || h.includes('ticker') || h.includes('instrument') || h.includes('scrip'));
-                const pnlIdx = headers.findIndex(h => h.includes('pnl') || h.includes('profit') || h.includes('net') || h.includes('realized'));
+                const symbolIdx = headers.findIndex(h => h.includes('symbol') || h.includes('stock') || h.includes('instrument') || h.includes('scrip'));
+                // 🟢 FIXED: Now catches "realised p&l" exactly
+                const pnlIdx = headers.findIndex(h => h.includes('p&l') || h.includes('realised') || h.includes('realized') || h.includes('profit') || h.includes('net'));
                 const dateIdx = headers.findIndex(h => h.includes('date') || h.includes('time') || h.includes('entry'));
                 const directionIdx = headers.findIndex(h => h.includes('direction') || h.includes('side') || h.includes('type'));
-                const entryPriceIdx = headers.findIndex(h => h.includes('entry') || h.includes('buy'));
-                const exitPriceIdx = headers.findIndex(h => h.includes('exit') || h.includes('sell'));
+                // 🟢 FIXED: Safely targets "buy price" and "sell price"
+                const entryPriceIdx = headers.findIndex(h => (h.includes('buy') || h.includes('entry')) && h.includes('price'));
+                const exitPriceIdx = headers.findIndex(h => (h.includes('sell') || h.includes('exit')) && h.includes('price'));
 
                 const rows = [];
                 
-                // 3. Parse Data Rows safely
+                // 3. PARSE ROWS
                 for (let i = headerIdx + 1; i < lines.length; i++) {
-                    // Regex handles complex cells where numbers have commas (e.g. "1,000.50")
                     const cols = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g)?.map(c => c.trim().replace(/['"]+/g, '')) || lines[i].split(',').map(c => c.trim());
                     
                     if (cols.length < Math.max(1, headers.length - 2)) continue; 
 
-                    // Clean numerical strings (strips currency symbols and internal commas)
                     let pnlVal = 0;
                     if (pnlIdx !== -1 && cols[pnlIdx]) {
                         pnlVal = parseFloat(cols[pnlIdx].replace(/[^0-9.-]+/g, '')) || 0;
@@ -81,17 +96,19 @@ const DataImport = ({ onBulkTradesImported }) => {
                     }
 
                     const symbolVal = symbolIdx !== -1 && cols[symbolIdx] ? cols[symbolIdx] : '';
-                    const rawDate = dateIdx !== -1 && cols[dateIdx] ? cols[dateIdx] : new Date().toISOString().split('T')[0];
+                    
+                    // 🟢 FIXED: Converts DD-MM-YYYY to DB ready YYYY-MM-DD
+                    const rawDate = dateIdx !== -1 && cols[dateIdx] ? formatBrokerDate(cols[dateIdx]) : new Date().toISOString().split('T')[0];
                     
                     let directionVal = 'LONG';
                     if (directionIdx !== -1 && cols[directionIdx]) {
                         const d = cols[directionIdx].toUpperCase();
                         if (d.includes('SELL') || d.includes('SHORT')) directionVal = 'SHORT';
                     } else {
-                        directionVal = pnlVal >= 0 ? 'LONG' : 'SHORT'; // Fallback logic
+                        // Fallback logic for Indian reports that don't specify Long/Short explicitly
+                        directionVal = pnlVal >= 0 ? 'LONG' : 'SHORT'; 
                     }
                     
-                    // Only push valid rows
                     if (symbolVal && symbolVal.toUpperCase() !== 'UNKNOWN') {
                         rows.push({
                             id: i,
@@ -101,7 +118,7 @@ const DataImport = ({ onBulkTradesImported }) => {
                             entryPrice: entryVal,
                             exitPrice: exitVal,
                             direction: directionVal,
-                            session: 'New York',
+                            session: 'Asian', // Defaulting to Asian/Indian session
                             model: 'CSV Import',
                             followedPlan: true
                         });
@@ -161,7 +178,6 @@ const DataImport = ({ onBulkTradesImported }) => {
                 <p style={{ color: '#9B9A97', margin: 0, fontSize: '0.85rem' }}>Upload trade exports from Groww, Zerodha, or custom trade logs in seconds.</p>
             </div>
 
-            {/* DROPZONE */}
             <div style={{
                 background: 'rgba(38,38,38,0.4)',
                 border: '2px dashed rgba(255,255,255,0.1)',
@@ -182,10 +198,9 @@ const DataImport = ({ onBulkTradesImported }) => {
                 <h3 style={{ margin: '0 0 6px 0', fontSize: '1.1rem' }}>
                     {fileName ? `Selected: ${fileName}` : 'Drag & Drop your broker CSV file here'}
                 </h3>
-                <p style={{ color: '#9B9A97', fontSize: '0.8rem', margin: 0 }}>Auto-detects Symbol, Date, Direction, and P&L columns</p>
+                <p style={{ color: '#9B9A97', fontSize: '0.8rem', margin: 0 }}>Auto-detects Stock Name, Date, Direction, and P&L columns</p>
             </div>
 
-            {/* STATUS MESSAGE */}
             {statusMessage && (
                 <div style={{
                     background: statusMessage.type === 'success' ? 'rgba(0,255,136,0.1)' : 'rgba(255,51,51,0.1)',
@@ -201,7 +216,6 @@ const DataImport = ({ onBulkTradesImported }) => {
                 </div>
             )}
 
-            {/* PREVIEW TABLE */}
             {parsedTrades.length > 0 && (
                 <div style={{ background: 'rgba(38,38,38,0.5)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '20px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -240,7 +254,7 @@ const DataImport = ({ onBulkTradesImported }) => {
                                         <td style={{ padding: '10px' }}>{t.entryPrice || '-'}</td>
                                         <td style={{ padding: '10px' }}>{t.exitPrice || '-'}</td>
                                         <td style={{ padding: '10px', textAlign: 'right', fontWeight: 700, color: t.profitLoss >= 0 ? '#00FF88' : '#FF3333' }}>
-                                            ${t.profitLoss}
+                                            {t.profitLoss >= 0 ? '+' : ''}${t.profitLoss}
                                         </td>
                                     </tr>
                                 ))}
@@ -254,7 +268,6 @@ const DataImport = ({ onBulkTradesImported }) => {
                     </div>
                 </div>
             )}
-
         </motion.div>
     );
 };
