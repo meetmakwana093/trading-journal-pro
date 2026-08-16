@@ -76,6 +76,31 @@ const MagneticCard = ({ children, style, className, ...props }) => {
   );
 };
 
+// 🟢 NEW: Classy Dynamic Tooltip
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    const val = payload[0].value;
+    const isNegative = val < 0;
+    const color = isNegative ? '#FF3333' : '#00FF88';
+    return (
+      <div style={{ 
+        background: 'rgba(10, 14, 23, 0.95)', border: `1px solid ${color}`, 
+        padding: '12px 16px', borderRadius: '8px', 
+        boxShadow: `0 8px 24px rgba(0,0,0,0.4), 0 0 12px ${isNegative ? 'rgba(255,51,51,0.2)' : 'rgba(0,255,136,0.2)'}`, 
+        backdropFilter: 'blur(10px)' 
+      }}>
+        <p style={{ color: 'rgba(255,255,255,0.6)', margin: '0 0 4px 0', fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px' }}>
+          {label}
+        </p>
+        <p style={{ color: color, margin: 0, fontWeight: 800, fontSize: '1.2rem', fontFamily: 'JetBrains Mono, monospace' }}>
+          {val >= 0 ? '+' : '-'}${Math.abs(val).toFixed(2)}
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
@@ -343,9 +368,21 @@ export default function App() {
     let cumulative = 0;
     return sortedTrades.map((t, index) => {
       cumulative += t.profitLoss;
-      return { trade: index + 1, cumulative: parseFloat(cumulative.toFixed(2)), date: t.entryTime };
+      return { trade: `T${index + 1}`, cumulative: parseFloat(cumulative.toFixed(2)), date: t.entryTime };
     });
   };
+
+  // 🟢 NEW: Mathematical Split Gradient Calculation
+  const accountGrowthData = calculateAccountGrowth(trades);
+  const getGradientOffset = () => {
+    if (accountGrowthData.length === 0) return 0;
+    const dataMax = Math.max(...accountGrowthData.map(i => i.cumulative));
+    const dataMin = Math.min(...accountGrowthData.map(i => i.cumulative));
+    if (dataMax <= 0) return 0;
+    if (dataMin >= 0) return 1;
+    return dataMax / (dataMax - dataMin);
+  };
+  const off = getGradientOffset();
 
   const calculateRecoveryFactor = (trades) => {
     if (trades.length === 0) return 0;
@@ -395,7 +432,6 @@ export default function App() {
     return calendarData;
   };
 
-  // 🟢 FIXED: Added Saturday and Sunday explicitly to the Day of Week Chart
   const calculateDOWPerformance = (trades) => {
     const dow = { 'Mon': 0, 'Tue': 0, 'Wed': 0, 'Thu': 0, 'Fri': 0, 'Sat': 0, 'Sun': 0 };
     trades.forEach(t => {
@@ -527,10 +563,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* MAIN CONTENT AREA */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 1, overflow: 'hidden' }}>
-        
-        {/* HEADER */}
         <header style={{ 
           height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
           padding: '0 24px', borderBottom: '1px solid rgba(255,255,255,0.03)', zIndex: 10, 
@@ -575,7 +608,6 @@ export default function App() {
           </div>
         </header>
 
-        {/* Scrollable Content Container */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '30px 40px' }}>
           <AnimatePresence mode="wait">
             {activeTab === 'home' ? (
@@ -594,12 +626,10 @@ export default function App() {
                           <PolarAngleAxis dataKey="subject" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 9 }} />
                           <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
                           <Radar name="Performance" dataKey="A" stroke="#00FF88" fill="#00FF88" fillOpacity={0.15} strokeWidth={2} />
-                          <Tooltip contentStyle={{ background: '#0D111C', border: '1px solid rgba(0,255,136,0.2)', borderRadius: '8px', fontSize: '0.8rem' }} />
                         </RadarChart>
                       </ResponsiveContainer>
                     </MagneticCard>
 
-                    {/* 🟢 FIXED: Day of Week Chart now has Gradient Fills and includes Sat/Sun */}
                     <MagneticCard style={{ background: 'rgba(13,17,28,0.9)', border: '1px solid rgba(0,255,136,0.12)', borderRadius: '16px', padding: '20px', boxShadow: '0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
                       <h3 style={{ color: 'rgba(255,255,255,0.7)', margin: '0 0 15px 0', fontSize: '0.8rem', textAlign: 'center', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Day of Week</h3>
                       <ResponsiveContainer width="100%" height={230}>
@@ -611,7 +641,10 @@ export default function App() {
                           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
                           <XAxis dataKey="day" stroke="rgba(255,255,255,0.3)" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                           <YAxis stroke="rgba(255,255,255,0.3)" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                          <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} contentStyle={{ background: '#0D111C', border: '1px solid rgba(0,255,136,0.2)', borderRadius: '8px', fontSize: '0.8rem' }} />
+                          
+                          {/* 🟢 FIXED: Universal Glassmorphism Tooltip added here */}
+                          <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} content={<CustomTooltip />} />
+                          
                           <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
                             {dowData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? 'url(#dowGreen)' : 'url(#dowRed)'} />)}
                           </Bar>
@@ -652,33 +685,37 @@ export default function App() {
                       ))}
                     </div>
 
-                    {/* 🟢 FIXED: Removed Symbol Performance and Expanded Account Growth */}
                     <MagneticCard style={{ background: 'rgba(13,17,28,0.95)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '24px', boxShadow: '0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)', marginBottom: '24px' }}>
                       <h3 style={{ color: 'rgba(255,255,255,0.6)', margin: '0 0 14px 0', fontSize: '0.75rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                         Account Growth Pipeline
                       </h3>
                       <ResponsiveContainer width="100%" height={260}>
-                        <AreaChart data={calculateAccountGrowth(trades)}>
+                        <AreaChart data={accountGrowthData}>
                           <defs>
-                            <linearGradient id="growthGradFull" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#00FF88" stopOpacity={0.4} />
-                              <stop offset="95%" stopColor="#00FF88" stopOpacity={0} />
+                            {/* 🟢 FIXED: Split Gradients calculate mathematically where the line crosses $0 */}
+                            <linearGradient id="splitColor" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset={off} stopColor="#00FF88" stopOpacity={0.4} />
+                              <stop offset={off} stopColor="#FF3333" stopOpacity={0.4} />
+                            </linearGradient>
+                            <linearGradient id="splitStroke" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset={off} stopColor="#00FF88" stopOpacity={1} />
+                              <stop offset={off} stopColor="#FF3333" stopOpacity={1} />
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
                           <XAxis dataKey="trade" stroke="rgba(255,255,255,0.25)" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
                           <YAxis stroke="rgba(255,255,255,0.25)" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                          <Tooltip 
-                            contentStyle={{ background: '#0D111C', border: '1px solid rgba(0,255,136,0.2)', borderRadius: '8px', fontSize: '0.8rem', color: '#FFF' }}
-                            itemStyle={{ color: '#00FF88', fontWeight: 'bold' }}
-                          />
+                          
+                          {/* 🟢 FIXED: Custom Tooltip implemented here */}
+                          <Tooltip cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1, strokeDasharray: '3 3' }} content={<CustomTooltip />} />
+                          
                           <Area 
                             type="monotone" 
                             dataKey="cumulative" 
-                            stroke="#00FF88" 
+                            stroke="url(#splitStroke)" 
                             strokeWidth={3} 
-                            fill="url(#growthGradFull)" 
-                            activeDot={{ r: 6, fill: '#00FF88', stroke: '#FFF', strokeWidth: 2 }}
+                            fill="url(#splitColor)" 
+                            activeDot={{ r: 6, fill: '#191919', stroke: 'url(#splitStroke)', strokeWidth: 2 }}
                           />
                         </AreaChart>
                       </ResponsiveContainer>

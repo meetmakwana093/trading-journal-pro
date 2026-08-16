@@ -2,12 +2,11 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  ScatterChart, Scatter, ZAxis
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 
 const Analytics = ({ trades = [] }) => {
-  const [activeTab, setActiveTab] = useState('performance'); // 'performance' or 'risk'
+  const [activeTab, setActiveTab] = useState('performance'); 
 
   // --- 1. CORE METRICS ---
   const metrics = useMemo(() => {
@@ -48,12 +47,23 @@ const Analytics = ({ trades = [] }) => {
     });
   }, [trades]);
 
+  // 🟢 FIXED: Split Gradient Offset specifically for Analytics Equity Curve
+  const getGradientOffset = () => {
+    if (growthData.length === 0) return 0;
+    const dataMax = Math.max(...growthData.map(i => i.cumulative));
+    const dataMin = Math.min(...growthData.map(i => i.cumulative));
+    if (dataMax <= 0) return 0;
+    if (dataMin >= 0) return 1;
+    return dataMax / (dataMax - dataMin);
+  };
+  const off = getGradientOffset();
+
   const drawdownData = useMemo(() => {
     let cumulative = 0, peak = 0;
     return [...trades].sort((a, b) => new Date(a.entryTime) - new Date(b.entryTime)).map((t, i) => {
       cumulative += t.profitLoss;
       if (cumulative > peak) peak = cumulative;
-      let currentDrawdown = peak === 0 ? 0 : cumulative - peak; // Dollar drawdown
+      let currentDrawdown = peak === 0 ? 0 : cumulative - peak; 
       return { trade: `T${i + 1}`, drawdown: parseFloat(currentDrawdown.toFixed(2)) };
     });
   }, [trades]);
@@ -88,27 +98,32 @@ const Analytics = ({ trades = [] }) => {
     return [{ name: 'Wins', value: wins }, { name: 'Losses', value: losses }];
   }, [trades]);
 
-  // --- STYLES ---
+  // --- STYLES & COMPONENTS ---
   const COLORS = { green: '#00FF88', red: '#FF3333', darkGreen: '#00B35F', darkRed: '#B32424', bg: '#191919', cardBg: 'rgba(38, 38, 38, 0.6)', border: 'rgba(255, 255, 255, 0.05)', textMuted: '#9B9A97', textBright: '#FFF' };
 
+  // 🟢 FIXED: Glassmorphism universal Tooltip
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
+      const val = payload[0].value;
+      const isNegative = val < 0;
+      const color = isNegative ? '#FF3333' : '#00FF88';
       return (
-        <div style={{ background: '#191919', border: `1px solid ${COLORS.border}`, padding: '10px 15px', borderRadius: '8px', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
-          <p style={{ color: COLORS.textMuted, margin: '0 0 5px 0', fontSize: '0.8rem', textTransform: 'uppercase' }}>{label}</p>
-          {payload.map((entry, index) => (
-            <p key={index} style={{ color: entry.color || COLORS.textBright, margin: 0, fontWeight: 'bold', fontSize: '1.1rem' }}>
-              {entry.name === 'drawdown' ? '' : '$'}{entry.value}
-            </p>
-          ))}
+        <div style={{ 
+          background: 'rgba(10, 14, 23, 0.95)', border: `1px solid ${color}`, 
+          padding: '12px 16px', borderRadius: '8px', 
+          boxShadow: `0 8px 24px rgba(0,0,0,0.4), 0 0 12px ${isNegative ? 'rgba(255,51,51,0.2)' : 'rgba(0,255,136,0.2)'}`, 
+          backdropFilter: 'blur(10px)' 
+        }}>
+          <p style={{ color: 'rgba(255,255,255,0.6)', margin: '0 0 4px 0', fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px' }}>
+            {label}
+          </p>
+          <p style={{ color: color, margin: 0, fontWeight: 800, fontSize: '1.2rem', fontFamily: 'JetBrains Mono, monospace' }}>
+            {val >= 0 ? '+' : '-'}${Math.abs(val).toFixed(2)}
+          </p>
         </div>
       );
     }
     return null;
-  };
-
-  const AnimatedNumber = ({ value, prefix = '', suffix = '' }) => {
-    return <span>{prefix}{value}{suffix}</span>; // Can be upgraded with framer-motion if desired
   };
 
   return (
@@ -169,16 +184,29 @@ const Analytics = ({ trades = [] }) => {
                 <ResponsiveContainer width="100%" height={300}>
                   <AreaChart data={growthData}>
                     <defs>
-                      <linearGradient id="colorPnL" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={COLORS.green} stopOpacity={0.4} />
-                        <stop offset="95%" stopColor={COLORS.green} stopOpacity={0} />
+                      <linearGradient id="splitColorAnalytic" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset={off} stopColor="#00FF88" stopOpacity={0.4} />
+                        <stop offset={off} stopColor="#FF3333" stopOpacity={0.4} />
+                      </linearGradient>
+                      <linearGradient id="splitStrokeAnalytic" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset={off} stopColor="#00FF88" stopOpacity={1} />
+                        <stop offset={off} stopColor="#FF3333" stopOpacity={1} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
                     <XAxis dataKey="trade" stroke={COLORS.textMuted} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
                     <YAxis stroke={COLORS.textMuted} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Area type="monotone" dataKey="cumulative" stroke={COLORS.green} strokeWidth={3} fillOpacity={1} fill="url(#colorPnL)" />
+                    
+                    <Tooltip cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1, strokeDasharray: '3 3' }} content={<CustomTooltip />} />
+                    
+                    <Area 
+                      type="monotone" 
+                      dataKey="cumulative" 
+                      stroke="url(#splitStrokeAnalytic)" 
+                      strokeWidth={3} 
+                      fill="url(#splitColorAnalytic)" 
+                      activeDot={{ r: 6, fill: '#191919', stroke: 'url(#splitStrokeAnalytic)', strokeWidth: 2 }} 
+                    />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -216,7 +244,9 @@ const Analytics = ({ trades = [] }) => {
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" horizontal={false} />
                     <XAxis type="number" stroke={COLORS.textMuted} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
                     <YAxis dataKey="model" type="category" stroke={COLORS.textBright} tick={{ fontSize: 11, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
+                    
                     <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} content={<CustomTooltip />} />
+                    
                     <Bar dataKey="pnl" radius={[0, 4, 4, 0]} barSize={24}>
                       {modelData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? COLORS.green : COLORS.red} />
@@ -238,7 +268,9 @@ const Analytics = ({ trades = [] }) => {
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
                     <XAxis dataKey="symbol" stroke={COLORS.textMuted} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
                     <YAxis stroke={COLORS.textMuted} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                    
                     <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} content={<CustomTooltip />} />
+                    
                     <Bar dataKey="pnl" radius={[6, 6, 0, 0]}>
                       {symbolData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? 'url(#barGreen)' : 'url(#barRed)'} />
@@ -288,8 +320,10 @@ const Analytics = ({ trades = [] }) => {
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
                   <XAxis dataKey="trade" stroke={COLORS.textMuted} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
                   <YAxis stroke={COLORS.textMuted} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} reversed={true} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Area type="monotone" dataKey="drawdown" stroke={COLORS.red} strokeWidth={3} fillOpacity={1} fill="url(#colorDD)" />
+                  
+                  <Tooltip cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1, strokeDasharray: '3 3' }} content={<CustomTooltip />} />
+                  
+                  <Area type="monotone" dataKey="drawdown" stroke={COLORS.red} strokeWidth={3} fillOpacity={1} fill="url(#colorDD)" activeDot={{ r: 6, fill: '#191919', stroke: COLORS.red, strokeWidth: 2 }} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -303,7 +337,9 @@ const Analytics = ({ trades = [] }) => {
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
                     <XAxis dataKey="name" stroke={COLORS.textMuted} tick={{ fontSize: 11, fontWeight: 'bold' }} axisLine={false} tickLine={false} />
                     <YAxis stroke={COLORS.textMuted} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                    
                     <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} content={<CustomTooltip />} />
+                    
                     <Bar dataKey="pnl" radius={[6, 6, 0, 0]}>
                       {directionData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? COLORS.green : COLORS.red} />
@@ -313,7 +349,7 @@ const Analytics = ({ trades = [] }) => {
                 </ResponsiveContainer>
               </div>
 
-              {/* R:R Scatter Map */}
+              {/* R:R Scatter Map Reminder */}
               <div style={{ background: COLORS.cardBg, border: `1px solid ${COLORS.border}`, borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
                 <div style={{ color: COLORS.textMuted, textAlign: 'center', maxWidth: '80%' }}>
                   <h3 style={{ margin: '0 0 10px 0', fontSize: '1rem', color: COLORS.textBright }}>Trade Distribution Warning</h3>
