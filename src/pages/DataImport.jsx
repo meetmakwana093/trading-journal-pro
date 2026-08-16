@@ -10,7 +10,6 @@ const DataImport = ({ onBulkTradesImported }) => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [statusMessage, setStatusMessage] = useState(null);
 
-    // Formats DD-MM-YYYY to YYYY-MM-DD for the database
     const formatBrokerDate = (dateStr) => {
         if (!dateStr) return new Date().toISOString().split('T')[0];
         if (dateStr.match(/^\d{2}[-/]\d{2}[-/]\d{4}/)) {
@@ -20,7 +19,6 @@ const DataImport = ({ onBulkTradesImported }) => {
         return dateStr;
     };
 
-    // CSV Row parser to handle commas inside numbers/names
     const parseCsvRow = (row) => {
         const result = [];
         let current = '';
@@ -60,11 +58,9 @@ const DataImport = ({ onBulkTradesImported }) => {
                 const lines = text.split(/\r\n|\n/).filter(line => line.trim() !== '');
                 if (lines.length < 2) throw new Error('File is empty or invalid.');
 
-                // 1. STRICT SCAN: Find the actual trade header row and bypass the preamble/charges
                 let headerIdx = -1;
                 for (let i = 0; i < lines.length; i++) {
                     const lowerLine = lines[i].toLowerCase();
-                    // Must START with these specific words to avoid matching the title string
                     if (lowerLine.startsWith('stock name') || lowerLine.startsWith('symbol') || lowerLine.startsWith('scrip')) {
                         headerIdx = i;
                         break;
@@ -75,7 +71,6 @@ const DataImport = ({ onBulkTradesImported }) => {
                     throw new Error('Could not detect the "Stock name" or "Symbol" row. Please check your CSV format.');
                 }
 
-                // 2. EXTRACT COLUMNS based exactly on the CSV provided
                 const headers = parseCsvRow(lines[headerIdx]).map(h => h.toLowerCase());
                 
                 const symbolIdx = headers.findIndex(h => h === 'stock name' || h === 'symbol' || h === 'scrip');
@@ -86,18 +81,13 @@ const DataImport = ({ onBulkTradesImported }) => {
 
                 const rows = [];
                 
-                // 3. PARSE ROWS
                 for (let i = headerIdx + 1; i < lines.length; i++) {
                     const cols = parseCsvRow(lines[i]);
-                    
                     const symbolVal = symbolIdx !== -1 && cols[symbolIdx] ? cols[symbolIdx] : '';
                     
-                    // STOP CONDITION: If we reach Unrealised trades or Disclaimers, stop parsing
                     if (symbolVal.toLowerCase().includes('unrealised') || symbolVal.toLowerCase().includes('disclaimer')) {
                         break;
                     }
-
-                    // SKIP EMPTY ROWS: Ensure it's a valid trade row
                     if (!symbolVal || cols.length < 5) continue;
 
                     let pnlVal = 0;
@@ -116,10 +106,8 @@ const DataImport = ({ onBulkTradesImported }) => {
                     }
 
                     const rawDate = dateIdx !== -1 && cols[dateIdx] ? formatBrokerDate(cols[dateIdx]) : new Date().toISOString().split('T')[0];
-                    const directionVal = pnlVal >= 0 ? 'LONG' : 'SHORT'; // Indian market cash trades fallback
-                    
-                    // Limit symbol string length just to be safe for the DB
-                    const safeSymbol = symbolVal.substring(0, 45).toUpperCase();
+                    const directionVal = pnlVal >= 0 ? 'LONG' : 'SHORT';
+                    const safeSymbol = symbolVal.substring(0, 95).toUpperCase(); // Prevents frontend limits
 
                     rows.push({
                         id: i,
@@ -161,9 +149,11 @@ const DataImport = ({ onBulkTradesImported }) => {
             },
             body: JSON.stringify({ trades: parsedTrades })
         })
-            .then(res => {
-                if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
-                return res.json();
+            .then(async res => {
+                const data = await res.json();
+                // 🟢 FIXED: Now catches the exact SQL Database Error Message instead of a generic "500"
+                if (!res.ok) throw new Error(data.error || `HTTP Error ${res.status}`);
+                return data;
             })
             .then(data => {
                 setIsProcessing(false);
@@ -176,7 +166,7 @@ const DataImport = ({ onBulkTradesImported }) => {
             })
             .catch(err => {
                 setIsProcessing(false);
-                setStatusMessage({ type: 'error', text: `Upload failed: Please make sure your database backend is running. (${err.message})` });
+                setStatusMessage({ type: 'error', text: `Database Error: ${err.message}` });
             });
     };
 

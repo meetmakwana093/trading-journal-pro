@@ -42,7 +42,7 @@ pool.query(`
   CREATE TABLE IF NOT EXISTS missed_trades (
     id INT PRIMARY KEY AUTO_INCREMENT,
     user_id INT NOT NULL,
-    symbol VARCHAR(20) NOT NULL,
+    symbol VARCHAR(100) NOT NULL,
     missed_entry_price DECIMAL(15,4) DEFAULT 0,
     missed_exit_price DECIMAL(15,4) DEFAULT 0,
     predicted_pnl DECIMAL(15,4) NOT NULL,
@@ -69,7 +69,7 @@ pool.query(`
   CREATE TABLE IF NOT EXISTS chart_gallery (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
-    symbol VARCHAR(50) NOT NULL,
+    symbol VARCHAR(100) NOT NULL,
     setup_name VARCHAR(100) DEFAULT '',
     date DATETIME NOT NULL,
     image_url LONGTEXT NOT NULL, 
@@ -97,7 +97,6 @@ pool.query(`
   )
 `).catch(() => {});
 
-// 🟢 NEW: User Settings Table
 pool.query(`
   CREATE TABLE IF NOT EXISTS user_settings (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -110,13 +109,17 @@ pool.query(`
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   )
-`).then(() => console.log('✅ Settings table ready')).catch(() => {});
+`).catch(() => {});
 
+// 🟢 FIXED: This will instantly expand your column limits to prevent crashes!
 async function updateTradesTable() {
   const queries = [
     "ALTER TABLE trades ADD COLUMN stop_loss DECIMAL(15,4) DEFAULT 0",
     "ALTER TABLE trades ADD COLUMN risk_reward DECIMAL(10,2) DEFAULT 0",
-    "ALTER TABLE trades ADD COLUMN playbook_id INT DEFAULT NULL"
+    "ALTER TABLE trades ADD COLUMN playbook_id INT DEFAULT NULL",
+    "ALTER TABLE trades MODIFY COLUMN symbol VARCHAR(100)",
+    "ALTER TABLE missed_trades MODIFY COLUMN symbol VARCHAR(100)",
+    "ALTER TABLE chart_gallery MODIFY COLUMN symbol VARCHAR(100)"
   ];
   for (let query of queries) {
     try { await pool.query(query); } catch (e) {}
@@ -245,7 +248,7 @@ app.post('/api/trades', verifyToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 🟢 NEW: BULK TRADES IMPORT (FOR CSV PARSING)
+// BULK TRADES IMPORT
 app.post('/api/trades/bulk', verifyToken, async (req, res) => {
   const { trades } = req.body;
   if (!Array.isArray(trades) || trades.length === 0) {
@@ -258,7 +261,7 @@ app.post('/api/trades/bulk', verifyToken, async (req, res) => {
     catch(e) { mysqlEntryTime = new Date().toISOString().slice(0, 19).replace('T', ' '); }
     
     return [
-      t.symbol ? t.symbol.toUpperCase() : 'UNKNOWN',
+      t.symbol ? t.symbol.toUpperCase().substring(0, 95) : 'UNKNOWN', // Enforce strict safe limits
       parseFloat(t.entryPrice) || 0,
       parseFloat(t.exitPrice) || 0,
       parseFloat(t.stopLoss) || 0,
@@ -293,7 +296,7 @@ app.post('/api/trades/bulk', verifyToken, async (req, res) => {
     const [rows] = await pool.query('SELECT * FROM trades WHERE user_id = ? ORDER BY entry_time DESC', [req.user.id]);
     res.json({ message: `Successfully imported ${trades.length} trades`, trades: rows.map(mapDBToReact) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err.message }); // 🟢 Exposes exact SQL error
   }
 });
 
@@ -372,7 +375,7 @@ app.post('/api/prep', verifyToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 🟢 NEW: USER SETTINGS ROUTES
+// USER SETTINGS
 app.get('/api/settings', verifyToken, async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM user_settings WHERE user_id = ?', [req.user.id]);
