@@ -10,15 +10,13 @@ const DataImport = ({ onBulkTradesImported }) => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [statusMessage, setStatusMessage] = useState(null);
 
-    // Custom Fast Client-Side CSV Parser
-    // Custom Fast Client-Side CSV Parser
+    // 🟢 UPGRADED: Smart Broker CSV Parser
     const handleFileUpload = (e) => {
         const file = e.target.files ? e.target.files[0] : null;
         if (!file) return;
 
-        // 🟢 NEW: Strict File Type Validation!
-        if (!file.name.endsWith('.csv')) {
-            setStatusMessage({ type: 'error', text: '❌ Invalid file format. Please open your Excel file and "Save As -> CSV", then upload the CSV file.' });
+        if (!file.name.toLowerCase().endsWith('.csv')) {
+            setStatusMessage({ type: 'error', text: '❌ Invalid file format. Please open your Excel file, click "Save As -> CSV", and upload the CSV file.' });
             return;
         }
 
@@ -31,40 +29,87 @@ const DataImport = ({ onBulkTradesImported }) => {
             try {
                 const text = event.target.result;
                 const lines = text.split(/\r\n|\n/).filter(line => line.trim() !== '');
-                if (lines.length < 2) throw new Error('File contains no data rows.');
+                if (lines.length < 2) throw new Error('File is empty or invalid.');
 
-                const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/['"]+/g, ''));
+                // 1. SMART SCAN: Hunt for the actual header row (bypassing Groww/Zerodha preambles)
+                let headerIdx = -1;
+                for (let i = 0; i < Math.min(lines.length, 20); i++) {
+                    const lowerLine = lines[i].toLowerCase();
+                    if (lowerLine.includes('symbol') || lowerLine.includes('instrument') || lowerLine.includes('ticker') || lowerLine.includes('scrip')) {
+                        headerIdx = i;
+                        break;
+                    }
+                }
 
-                const symbolIdx = headers.findIndex(h => h.includes('symbol') || h.includes('ticker') || h.includes('instrument') || h.includes('pair'));
-                const pnlIdx = headers.findIndex(h => h.includes('pnl') || h.includes('profit') || h.includes('net') || h.includes('p/l') || h.includes('amount') || h.includes('realized'));
+                if (headerIdx === -1) {
+                    throw new Error('Could not detect column headers. Make sure your CSV contains a "Symbol" or "Instrument" column.');
+                }
+
+                // 2. Extract column positions
+                const headers = lines[headerIdx].split(',').map(h => h.trim().toLowerCase().replace(/['"]+/g, ''));
+                
+                const symbolIdx = headers.findIndex(h => h.includes('symbol') || h.includes('ticker') || h.includes('instrument') || h.includes('scrip'));
+                const pnlIdx = headers.findIndex(h => h.includes('pnl') || h.includes('profit') || h.includes('net') || h.includes('realized'));
                 const dateIdx = headers.findIndex(h => h.includes('date') || h.includes('time') || h.includes('entry'));
                 const directionIdx = headers.findIndex(h => h.includes('direction') || h.includes('side') || h.includes('type'));
-                const entryPriceIdx = headers.findIndex(h => (h.includes('entry') && h.includes('price')) || h.includes('buy price'));
-                const exitPriceIdx = headers.findIndex(h => (h.includes('exit') && h.includes('price')) || h.includes('sell price'));
+                const entryPriceIdx = headers.findIndex(h => h.includes('entry') || h.includes('buy'));
+                const exitPriceIdx = headers.findIndex(h => h.includes('exit') || h.includes('sell'));
 
                 const rows = [];
-                for (let i = 1; i < lines.length; i++) {
-                    // Handle commas inside quotes for complex CSVs
-                    const cols = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g)?.map(c => c.trim().replace(/['"]+/g, '')) || [];
-                    if (cols.length < headers.length) continue;
+                
+                // 3. Parse Data Rows safely
+                for (let i = headerIdx + 1; i < lines.length; i++) {
+                    // Regex handles complex cells where numbers have commas (e.g. "1,000.50")
+                    const cols = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g)?.map(c => c.trim().replace(/['"]+/g, '')) || lines[i].split(',').map(c => c.trim());
+                    
+                    if (cols.length < Math.max(1, headers.length - 2)) continue; 
 
-                    const pnlVal = parseFloat(cols[pnlIdx]) || 0;
-                    const symbolVal = symbolIdx !== -1 ? cols[symbolIdx] : 'UNKNOWN';
-                    const rawDate = dateIdx !== -1 ? cols[dateIdx] : new Date().toISOString().split('T')[0];
-                    const directionVal = directionIdx !== -1 ? cols[directionIdx].toUpperCase() : (pnlVal >= 0 ? 'LONG' : 'SHORT');
+                    // Clean numerical strings (strips currency symbols and internal commas)
+                    let pnlVal = 0;
+                    if (pnlIdx !== -1 && cols[pnlIdx]) {
+                        pnlVal = parseFloat(cols[pnlIdx].replace(/[^0-9.-]+/g, '')) || 0;
+                    }
 
-                    rows.push({
-                        id: i,
-                        symbol: symbolVal.toUpperCase(),
-                        profitLoss: pnlVal,
-                        date: rawDate,
-                        entryPrice: entryPriceIdx !== -1 ? parseFloat(cols[entryPriceIdx]) || 0 : 0,
-                        exitPrice: exitPriceIdx !== -1 ? parseFloat(cols[exitPriceIdx]) || 0 : 0,
-                        direction: directionVal.includes('BUY') || directionVal.includes('LONG') ? 'LONG' : 'SHORT',
-                        session: 'New York',
-                        model: 'CSV Import',
-                        followedPlan: true
-                    });
+                    let entryVal = 0;
+                    if (entryPriceIdx !== -1 && cols[entryPriceIdx]) {
+                        entryVal = parseFloat(cols[entryPriceIdx].replace(/[^0-9.-]+/g, '')) || 0;
+                    }
+
+                    let exitVal = 0;
+                    if (exitPriceIdx !== -1 && cols[exitPriceIdx]) {
+                        exitVal = parseFloat(cols[exitPriceIdx].replace(/[^0-9.-]+/g, '')) || 0;
+                    }
+
+                    const symbolVal = symbolIdx !== -1 && cols[symbolIdx] ? cols[symbolIdx] : '';
+                    const rawDate = dateIdx !== -1 && cols[dateIdx] ? cols[dateIdx] : new Date().toISOString().split('T')[0];
+                    
+                    let directionVal = 'LONG';
+                    if (directionIdx !== -1 && cols[directionIdx]) {
+                        const d = cols[directionIdx].toUpperCase();
+                        if (d.includes('SELL') || d.includes('SHORT')) directionVal = 'SHORT';
+                    } else {
+                        directionVal = pnlVal >= 0 ? 'LONG' : 'SHORT'; // Fallback logic
+                    }
+                    
+                    // Only push valid rows
+                    if (symbolVal && symbolVal.toUpperCase() !== 'UNKNOWN') {
+                        rows.push({
+                            id: i,
+                            symbol: symbolVal.toUpperCase(),
+                            profitLoss: pnlVal,
+                            date: rawDate,
+                            entryPrice: entryVal,
+                            exitPrice: exitVal,
+                            direction: directionVal,
+                            session: 'New York',
+                            model: 'CSV Import',
+                            followedPlan: true
+                        });
+                    }
+                }
+
+                if (rows.length === 0) {
+                    throw new Error("Found the headers, but couldn't read any valid trade data below them.");
                 }
 
                 setParsedTrades(rows);
@@ -75,6 +120,37 @@ const DataImport = ({ onBulkTradesImported }) => {
             }
         };
         reader.readAsText(file);
+    };
+
+    const handleCommit = () => {
+        if (parsedTrades.length === 0) return;
+        setIsProcessing(true);
+
+        fetch(`${API}/trades/bulk`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${getToken()}`
+            },
+            body: JSON.stringify({ trades: parsedTrades })
+        })
+            .then(res => {
+                if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+                return res.json();
+            })
+            .then(data => {
+                setIsProcessing(false);
+                if (data.trades && onBulkTradesImported) {
+                    onBulkTradesImported(data.trades);
+                }
+                setStatusMessage({ type: 'success', text: `✅ Successfully imported ${parsedTrades.length} trades into your database!` });
+                setParsedTrades([]);
+                setFileName('');
+            })
+            .catch(err => {
+                setIsProcessing(false);
+                setStatusMessage({ type: 'error', text: `Upload failed: ${err.message}` });
+            });
     };
 
     return (
@@ -93,13 +169,14 @@ const DataImport = ({ onBulkTradesImported }) => {
                 padding: '40px 20px',
                 textAlign: 'center',
                 marginBottom: '24px',
-                position: 'relative'
+                position: 'relative',
+                transition: 'all 0.2s',
             }}>
                 <input
                     type="file"
                     accept=".csv"
                     onChange={handleFileUpload}
-                    style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }}
+                    style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%', zIndex: 10 }}
                 />
                 <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>📁</div>
                 <h3 style={{ margin: '0 0 6px 0', fontSize: '1.1rem' }}>
