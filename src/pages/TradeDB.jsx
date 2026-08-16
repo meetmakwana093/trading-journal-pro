@@ -349,13 +349,13 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateT
                   <td style={styles.td}><span style={styles.pill(trade.session || 'New York')}>{trade.session || 'N/A'}</span></td>
                   <td style={styles.td}><span style={styles.pill(trade.direction || (trade.profitLoss > 0 ? 'LONG' : 'SHORT'))}>{trade.direction || '-'}</span></td>
                   
-                  {/* 🟢 FIXED: Properly handles rendering of 0 values */}
-                  <td style={styles.td}>{trade.entryPrice !== 0 ? trade.entryPrice : '-'}</td>
-                  <td style={styles.td}>{trade.stopLoss !== 0 ? trade.stopLoss : '-'}</td>
-                  <td style={styles.td}>{trade.exitPrice !== 0 ? trade.exitPrice : '-'}</td>
+                  {/* 🟢 FIXED: Safe Rendering logic so it never prints undefined */}
+                  <td style={styles.td}>{trade.entryPrice ? trade.entryPrice : '-'}</td>
+                  <td style={styles.td}>{trade.stopLoss ? trade.stopLoss : '-'}</td>
+                  <td style={styles.td}>{trade.exitPrice ? trade.exitPrice : '-'}</td>
                   
                   <td style={{...styles.td, color: trade.riskReward > 0 ? '#219653' : trade.riskReward < 0 ? '#EB5757' : '#9B9A97', fontWeight: 'bold'}}>
-                    {trade.riskReward !== 0 ? `${trade.riskReward}R` : '-'}
+                    {trade.riskReward ? `${trade.riskReward}R` : '-'}
                   </td>
 
                   <td style={{...styles.td, color: trade.profitLoss > 0 ? '#219653' : '#EB5757', fontWeight: 'bold'}}>

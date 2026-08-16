@@ -7,14 +7,13 @@ import Analytics from './pages/Analytics.jsx';
 import MissedTradeDB from './pages/MissedTradeDB.jsx';
 import TradesDB from './pages/TradeDB.jsx';
 import Playbook from './pages/Playbook.jsx';
-import ChartGallery from './pages/ChartGallery.jsx'; // 🟢 NEW TAB COMPONENT
+import ChartGallery from './pages/ChartGallery.jsx';
 import LoginPage from './pages/LoginPage';
 import { getUser, getToken, saveAuth, logout } from './auth/authService';
 import './App.css';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-// Animated number counter
 const AnimatedNumber = ({ value, prefix = '', suffix = '', decimals = 2 }) => {
   const [display, setDisplay] = useState(0);
   useEffect(() => {
@@ -38,7 +37,6 @@ const AnimatedNumber = ({ value, prefix = '', suffix = '', decimals = 2 }) => {
   return <span>{prefix}{display.toFixed(decimals)}{suffix}</span>;
 };
 
-// Magnetic card component
 const MagneticCard = ({ children, style, className, ...props }) => {
   const ref = useRef(null);
   const x = useMotionValue(0);
@@ -74,7 +72,7 @@ export default function App() {
   const [trades, setTrades] = useState([]);
   const [missedTrades, setMissedTrades] = useState([]);
   const [playbooks, setPlaybooks] = useState([]); 
-  const [charts, setCharts] = useState([]); // 🟢 NEW STATE
+  const [charts, setCharts] = useState([]); 
   const [user, setUser] = useState(getUser());
   const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
@@ -85,12 +83,15 @@ export default function App() {
     return [];
   };
 
+  // 🟢 FIXED: Properly mapping Stop Loss and Risk Reward from backend
   const formatTradeData = (data) => ({
     id: data.id,
     symbol: data.symbol,
     entryPrice: parseFloat(data.entryPrice !== undefined ? data.entryPrice : data.entry_price) || 0,
     exitPrice: parseFloat(data.exitPrice !== undefined ? data.exitPrice : data.exit_price) || 0,
+    stopLoss: parseFloat(data.stopLoss !== undefined ? data.stopLoss : data.stop_loss) || 0, // FIXED HERE
     profitLoss: parseFloat(data.profitLoss !== undefined ? data.profitLoss : data.profit_loss) || 0,
+    riskReward: parseFloat(data.riskReward !== undefined ? data.riskReward : data.risk_reward) || 0, // FIXED HERE
     entryTime: data.entryTime || data.entry_time,
     session: data.session || '',
     direction: data.direction || '',
@@ -100,6 +101,7 @@ export default function App() {
     wentRight: data.wentRight || data.went_right || '',
     entryWindow: data.entryWindow || data.entry_window || '',
     model: data.model || '',
+    playbookId: data.playbookId || data.playbook_id || null, 
     positiveTags: parseTags(data.positiveTags || data.positive_tags),
     negativeTags: parseTags(data.negativeTags || data.negative_tags),
     account: data.account || '',
@@ -133,7 +135,6 @@ export default function App() {
       .then(data => { if (Array.isArray(data)) setPlaybooks(data); })
       .catch(err => console.error('Failed to fetch playbooks:', err));
 
-    // 🟢 NEW: Fetch Charts
     fetch(`${API}/charts`, { headers: { 'Authorization': `Bearer ${getToken()}` } })
       .then(res => res.json())
       .then(data => { if (Array.isArray(data)) setCharts(data); })
@@ -141,7 +142,7 @@ export default function App() {
   }, [user]);
 
   const handleAddTrade = (newTrade) => {
-    const safeTrade = { entryPrice: 0, exitPrice: 0, ...newTrade };
+    const safeTrade = { entryPrice: 0, exitPrice: 0, stopLoss: 0, riskReward: 0, ...newTrade };
     fetch(`${API}/trades`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
@@ -203,7 +204,6 @@ export default function App() {
       .catch(err => console.error('Failed to delete playbook:', err));
   };
 
-  // 🟢 NEW: Chart Handlers
   const handleAddChart = (newChart) => {
     fetch(`${API}/charts`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` }, body: JSON.stringify(newChart) })
       .then(res => res.json())
