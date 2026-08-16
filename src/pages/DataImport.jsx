@@ -20,7 +20,7 @@ const DataImport = ({ onBulkTradesImported }) => {
         return dateStr;
     };
 
-    // 🟢 NEW: Bulletproof CSV row parser (Handles spaces & commas inside quotes perfectly)
+    // CSV Row parser to handle commas inside numbers/names
     const parseCsvRow = (row) => {
         const result = [];
         let current = '';
@@ -60,34 +60,29 @@ const DataImport = ({ onBulkTradesImported }) => {
                 const lines = text.split(/\r\n|\n/).filter(line => line.trim() !== '');
                 if (lines.length < 2) throw new Error('File is empty or invalid.');
 
-                // 1. SMART SCAN for headers
+                // 1. STRICT SCAN: Find the actual trade header row and bypass the preamble/charges
                 let headerIdx = -1;
-                for (let i = 0; i < Math.min(lines.length, 20); i++) {
+                for (let i = 0; i < lines.length; i++) {
                     const lowerLine = lines[i].toLowerCase();
-                    if (
-                        lowerLine.includes('symbol') || lowerLine.includes('instrument') || 
-                        lowerLine.includes('ticker') || lowerLine.includes('scrip') || 
-                        lowerLine.includes('stock') || lowerLine.includes('security') || 
-                        lowerLine.includes('company')
-                    ) {
+                    // Must START with these specific words to avoid matching the title string
+                    if (lowerLine.startsWith('stock name') || lowerLine.startsWith('symbol') || lowerLine.startsWith('scrip')) {
                         headerIdx = i;
                         break;
                     }
                 }
 
                 if (headerIdx === -1) {
-                    throw new Error('Could not detect column headers. Make sure your CSV contains a "Stock name" or "Symbol" column.');
+                    throw new Error('Could not detect the "Stock name" or "Symbol" row. Please check your CSV format.');
                 }
 
-                // 2. EXTRACT COLUMNS safely
+                // 2. EXTRACT COLUMNS based exactly on the CSV provided
                 const headers = parseCsvRow(lines[headerIdx]).map(h => h.toLowerCase());
                 
-                const symbolIdx = headers.findIndex(h => h.includes('symbol') || h.includes('stock') || h.includes('instrument') || h.includes('scrip'));
-                const pnlIdx = headers.findIndex(h => h.includes('p&l') || h.includes('realised') || h.includes('realized') || h.includes('profit') || h.includes('net'));
-                const dateIdx = headers.findIndex(h => h.includes('date') || h.includes('time') || h.includes('entry'));
-                const directionIdx = headers.findIndex(h => h.includes('direction') || h.includes('side') || h.includes('type'));
-                const entryPriceIdx = headers.findIndex(h => (h.includes('buy') || h.includes('entry') || h.includes('avg')) && (h.includes('price') || h.includes('cost')));
-                const exitPriceIdx = headers.findIndex(h => (h.includes('sell') || h.includes('exit') || h.includes('avg')) && (h.includes('price')));
+                const symbolIdx = headers.findIndex(h => h === 'stock name' || h === 'symbol' || h === 'scrip');
+                const pnlIdx = headers.findIndex(h => h === 'realised p&l' || h === 'realized pnl' || h === 'net profit' || h.includes('p&l'));
+                const dateIdx = headers.findIndex(h => h === 'buy date' || h === 'date' || h === 'entry date');
+                const entryPriceIdx = headers.findIndex(h => h === 'buy price' || h === 'entry price' || h === 'avg buy price');
+                const exitPriceIdx = headers.findIndex(h => h === 'sell price' || h === 'exit price' || h === 'avg sell price');
 
                 const rows = [];
                 
@@ -95,7 +90,15 @@ const DataImport = ({ onBulkTradesImported }) => {
                 for (let i = headerIdx + 1; i < lines.length; i++) {
                     const cols = parseCsvRow(lines[i]);
                     
-                    if (cols.length < Math.max(1, headers.length - 2)) continue; 
+                    const symbolVal = symbolIdx !== -1 && cols[symbolIdx] ? cols[symbolIdx] : '';
+                    
+                    // STOP CONDITION: If we reach Unrealised trades or Disclaimers, stop parsing
+                    if (symbolVal.toLowerCase().includes('unrealised') || symbolVal.toLowerCase().includes('disclaimer')) {
+                        break;
+                    }
+
+                    // SKIP EMPTY ROWS: Ensure it's a valid trade row
+                    if (!symbolVal || cols.length < 5) continue;
 
                     let pnlVal = 0;
                     if (pnlIdx !== -1 && cols[pnlIdx]) {
@@ -112,35 +115,28 @@ const DataImport = ({ onBulkTradesImported }) => {
                         exitVal = parseFloat(cols[exitPriceIdx].replace(/[^0-9.-]+/g, '')) || 0;
                     }
 
-                    const symbolVal = symbolIdx !== -1 && cols[symbolIdx] ? cols[symbolIdx] : '';
                     const rawDate = dateIdx !== -1 && cols[dateIdx] ? formatBrokerDate(cols[dateIdx]) : new Date().toISOString().split('T')[0];
+                    const directionVal = pnlVal >= 0 ? 'LONG' : 'SHORT'; // Indian market cash trades fallback
                     
-                    let directionVal = 'LONG';
-                    if (directionIdx !== -1 && cols[directionIdx]) {
-                        const d = cols[directionIdx].toUpperCase();
-                        if (d.includes('SELL') || d.includes('SHORT')) directionVal = 'SHORT';
-                    } else {
-                        directionVal = pnlVal >= 0 ? 'LONG' : 'SHORT'; 
-                    }
-                    
-                    if (symbolVal && symbolVal.toUpperCase() !== 'UNKNOWN') {
-                        rows.push({
-                            id: i,
-                            symbol: symbolVal.toUpperCase(),
-                            profitLoss: pnlVal,
-                            date: rawDate,
-                            entryPrice: entryVal,
-                            exitPrice: exitVal,
-                            direction: directionVal,
-                            session: 'Asian',
-                            model: 'CSV Import',
-                            followedPlan: true
-                        });
-                    }
+                    // Limit symbol string length just to be safe for the DB
+                    const safeSymbol = symbolVal.substring(0, 45).toUpperCase();
+
+                    rows.push({
+                        id: i,
+                        symbol: safeSymbol,
+                        profitLoss: pnlVal,
+                        date: rawDate,
+                        entryPrice: entryVal,
+                        exitPrice: exitVal,
+                        direction: directionVal,
+                        session: 'Asian',
+                        model: 'CSV Import',
+                        followedPlan: true
+                    });
                 }
 
                 if (rows.length === 0) {
-                    throw new Error("Found the headers, but couldn't read any valid trade data below them.");
+                    throw new Error("Headers detected, but no valid executed trades found.");
                 }
 
                 setParsedTrades(rows);
@@ -180,7 +176,7 @@ const DataImport = ({ onBulkTradesImported }) => {
             })
             .catch(err => {
                 setIsProcessing(false);
-                setStatusMessage({ type: 'error', text: `Upload failed: ${err.message}` });
+                setStatusMessage({ type: 'error', text: `Upload failed: Please make sure your database backend is running. (${err.message})` });
             });
     };
 
