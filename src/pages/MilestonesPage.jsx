@@ -1,33 +1,50 @@
-import React, { useMemo } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
+// 🟢 UPGRADED: Massive structured badge list (Easy to Hard)
 const BADGES = [
   { id: 'first-trade', label: 'First Trade Ever', icon: '🏁', description: 'Executed your first logged trade.' },
   { id: 'first-profit', label: 'First Profitable Trade', icon: '💰', description: 'Closed a trade in the green.' },
   { id: 'first-loss', label: 'First Loss (Learning)', icon: '📉', description: 'Took a loss and logged it properly.' },
-  { id: 'win-streak-5', label: 'Win Streak (5)', icon: '🔥', description: '5 consecutive winning trades.' },
-  { id: 'win-streak-10', label: 'Win Streak (10)', icon: '🔥', description: '10 consecutive winning trades.' },
-  { id: 'win-streak-20', label: 'Win Streak (20)', icon: '🔥', description: '20 consecutive winning trades.' },
+  { id: 'win-streak-3', label: 'Win Streak (3)', icon: '🔥', description: '3 consecutive winning trades.' },
+  { id: 'green-month', label: 'Green Month', icon: '🌱', description: 'Closed a month with net positive P&L.' },
+  { id: 'days-streak-7', label: '7-Day Grind', icon: '📅', description: 'Traded 7 consecutive active days.' },
   { id: 'profit-100', label: 'Profit Milestone ($100)', icon: '💵', description: 'Reached $100 in total net profit.' },
+  { id: 'win-streak-5', label: 'Win Streak (5)', icon: '🔥', description: '5 consecutive winning trades.' },
+  { id: 'consistency-50', label: 'Consistency (50%)', icon: '📊', description: 'Maintained a 50% consistency metric.' },
   { id: 'profit-500', label: 'Profit Milestone ($500)', icon: '💵', description: 'Reached $500 in total net profit.' },
+  { id: 'flawless-day', label: 'Flawless Session', icon: '💎', description: '100% win rate in a day with 3+ trades.' },
+  { id: 'win-streak-10', label: 'Win Streak (10)', icon: '🔥', description: '10 consecutive winning trades.' },
+  { id: 'trade-100', label: 'Centurion', icon: '⚔️', description: 'Logged 100 total executions.' },
   { id: 'profit-1k', label: 'Profit Milestone ($1K)', icon: '💸', description: 'Reached $1,000 in total net profit.' },
+  { id: 'monthly-goal', label: 'Monthly Goal Reached', icon: '🎯', description: 'Hit your defined monthly profit target ($1,000).' },
+  { id: 'consistency-60', label: 'Consistency (60%)', icon: '📊', description: 'Maintained a 60% consistency metric.' },
+  { id: 'days-streak-30', label: '30-Day Grind', icon: '📅', description: 'Traded 30 consecutive active days.' },
+  { id: 'iron-discipline', label: 'Iron Discipline', icon: '🛡️', description: '20 consecutive trades following your plan.' },
+  { id: 'win-streak-20', label: 'Win Streak (20)', icon: '🔥', description: '20 consecutive winning trades.' },
+  { id: 'sniper', label: 'The Sniper', icon: '🎯', description: 'Profit Factor > 2.0 over 50+ total trades.' },
   { id: 'profit-5k', label: 'Profit Milestone ($5K)', icon: '🏦', description: 'Reached $5,000 in total net profit.' },
-  { id: 'days-streak-7', label: 'Trading Days Streak (7)', icon: '📅', description: 'Traded 7 consecutive active days.' },
-  { id: 'days-streak-30', label: 'Trading Days Streak (30)', icon: '📅', description: 'Traded 30 consecutive active days.' },
-  { id: 'days-streak-100', label: 'Trading Days Streak (100)', icon: '📆', description: 'Traded 100 consecutive active days.' },
-  { id: 'monthly-goal', label: 'Monthly Goal Reached', icon: '🎯', description: 'Hit your defined monthly profit target.' },
-  { id: 'consistency-50', label: 'Consistency Score (50%)', icon: '📊', description: 'Maintained a 50% consistency metric.' },
-  { id: 'consistency-60', label: 'Consistency Score (60%)', icon: '📊', description: 'Maintained a 60% consistency metric.' },
-  { id: 'consistency-70', label: 'Consistency Score (70%)', icon: '📈', description: 'Elite 70% consistency metric reached.' }
+  { id: 'profit-10k', label: 'Profit Milestone ($10K)', icon: '🏆', description: 'Reached $10,000 in total net profit.' },
+  { id: 'consistency-70', label: 'Consistency (70%)', icon: '📈', description: 'Elite 70% consistency metric reached.' },
+  { id: 'trade-500', label: 'The Veteran', icon: '🦅', description: 'Logged 500 total executions.' },
+  { id: 'days-streak-100', label: '100-Day Grind', icon: '📆', description: 'Traded 100 consecutive active days.' },
+  { id: 'profit-50k', label: 'Profit Milestone ($50K)', icon: '👑', description: 'Reached $50,000 in total net profit.' }
 ];
 
 const MilestonesPage = ({ trades = [] }) => {
+  const [selectedBadge, setSelectedBadge] = useState(null); // 🟢 NEW: State for interactive modal
 
   // --- SAFE DATE HELPERS ---
   const getSafeDateStr = (dateInput) => {
     if (!dateInput) return '';
     return dateInput.split('T')[0].split(' ')[0];
+  };
+
+  const formatMonthLabel = (yyyy_mm) => {
+    const [y, m] = yyyy_mm.split('-');
+    const d = new Date(y, m - 1);
+    return d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
   };
 
   const sortedTrades = useMemo(() => {
@@ -45,7 +62,7 @@ const MilestonesPage = ({ trades = [] }) => {
         currentStreak++;
         if (currentStreak > maxStreak) {
           maxStreak = currentStreak;
-          [5, 10, 20].forEach(milestone => {
+          [3, 5, 10, 20].forEach(milestone => {
             if (currentStreak === milestone && !dates[milestone]) {
               dates[milestone] = getSafeDateStr(trade.entryTime || trade.date);
             }
@@ -59,7 +76,7 @@ const MilestonesPage = ({ trades = [] }) => {
   };
 
   const calculateProfitMilestones = (tradeList) => {
-    const milestones = [100, 500, 1000, 5000];
+    const milestones = [100, 500, 1000, 5000, 10000, 50000];
     const achieved = {};
     const dates = {};
     let cumulative = 0;
@@ -97,8 +114,7 @@ const MilestonesPage = ({ trades = [] }) => {
       if (index > 0) {
         const prevDay = new Date(sortedDays[index - 1]);
         const currDay = new Date(day);
-        const diffTime = Math.abs(currDay - prevDay);
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const diffDays = Math.ceil(Math.abs(currDay - prevDay) / (1000 * 60 * 60 * 24));
 
         if (diffDays === 1) {
           currentStreak++;
@@ -134,22 +150,15 @@ const MilestonesPage = ({ trades = [] }) => {
     achievements['first-trade'].achieved = true;
     achievements['first-trade'].date = getSafeDateStr(tradeList[0].entryTime || tradeList[0].date);
 
-    // First profitable trade
     const firstProfitable = tradeList.find(t => t.profitLoss > 0);
-    if (firstProfitable) {
-      achievements['first-profit'].achieved = true;
-      achievements['first-profit'].date = getSafeDateStr(firstProfitable.entryTime || firstProfitable.date);
-    }
+    if (firstProfitable) { achievements['first-profit'].achieved = true; achievements['first-profit'].date = getSafeDateStr(firstProfitable.entryTime || firstProfitable.date); }
 
-    // First loss
     const firstLoss = tradeList.find(t => t.profitLoss < 0);
-    if (firstLoss) {
-      achievements['first-loss'].achieved = true;
-      achievements['first-loss'].date = getSafeDateStr(firstLoss.entryTime || firstLoss.date);
-    }
+    if (firstLoss) { achievements['first-loss'].achieved = true; achievements['first-loss'].date = getSafeDateStr(firstLoss.entryTime || firstLoss.date); }
 
     // Streaks
     const winStreaks = calculateWinStreaks(tradeList);
+    if (winStreaks.maxStreak >= 3) { achievements['win-streak-3'].achieved = true; achievements['win-streak-3'].date = winStreaks.dates[3]; }
     if (winStreaks.maxStreak >= 5) { achievements['win-streak-5'].achieved = true; achievements['win-streak-5'].date = winStreaks.dates[5]; }
     if (winStreaks.maxStreak >= 10) { achievements['win-streak-10'].achieved = true; achievements['win-streak-10'].date = winStreaks.dates[10]; }
     if (winStreaks.maxStreak >= 20) { achievements['win-streak-20'].achieved = true; achievements['win-streak-20'].date = winStreaks.dates[20]; }
@@ -160,19 +169,89 @@ const MilestonesPage = ({ trades = [] }) => {
     if (profitMilestones.achieved[500]) { achievements['profit-500'].achieved = true; achievements['profit-500'].date = profitMilestones.dates[500]; }
     if (profitMilestones.achieved[1000]) { achievements['profit-1k'].achieved = true; achievements['profit-1k'].date = profitMilestones.dates[1000]; }
     if (profitMilestones.achieved[5000]) { achievements['profit-5k'].achieved = true; achievements['profit-5k'].date = profitMilestones.dates[5000]; }
+    if (profitMilestones.achieved[10000]) { achievements['profit-10k'].achieved = true; achievements['profit-10k'].date = profitMilestones.dates[10000]; }
+    if (profitMilestones.achieved[50000]) { achievements['profit-50k'].achieved = true; achievements['profit-50k'].date = profitMilestones.dates[50000]; }
 
-    // Days
+    // Execution Volume
+    if (tradeList.length >= 100) { achievements['trade-100'].achieved = true; achievements['trade-100'].date = getSafeDateStr(tradeList[99].entryTime || tradeList[99].date); }
+    if (tradeList.length >= 500) { achievements['trade-500'].achieved = true; achievements['trade-500'].date = getSafeDateStr(tradeList[499].entryTime || tradeList[499].date); }
+
+    // Days Streaks
     const daysStreaks = calculateTradingDaysStreak(tradeList);
     if (daysStreaks.maxStreak >= 7) { achievements['days-streak-7'].achieved = true; achievements['days-streak-7'].date = daysStreaks.dates[7]; }
     if (daysStreaks.maxStreak >= 30) { achievements['days-streak-30'].achieved = true; achievements['days-streak-30'].date = daysStreaks.dates[30]; }
     if (daysStreaks.maxStreak >= 100) { achievements['days-streak-100'].achieved = true; achievements['days-streak-100'].date = daysStreaks.dates[100]; }
 
-    // Monthly Goal Check
-    const currentMonth = new Date().toISOString().slice(0, 7);
-    const monthProfit = tradeList.filter(t => getSafeDateStr(t.entryTime || t.date).startsWith(currentMonth)).reduce((sum, t) => sum + t.profitLoss, 0);
-    if (monthProfit >= 1000) {
+    // Flawless Day (100% WR with 3+ trades)
+    const dailyMap = {};
+    tradeList.forEach(t => {
+      const d = getSafeDateStr(t.entryTime || t.date);
+      if(!dailyMap[d]) dailyMap[d] = { count: 0, wins: 0 };
+      dailyMap[d].count++;
+      if (t.profitLoss > 0) dailyMap[d].wins++;
+    });
+    const flawlessDays = Object.keys(dailyMap).filter(d => dailyMap[d].count >= 3 && dailyMap[d].count === dailyMap[d].wins);
+    if (flawlessDays.length > 0) {
+      achievements['flawless-day'].achieved = true;
+      achievements['flawless-day'].date = flawlessDays[0];
+    }
+
+    // Iron Discipline (20 consecutive followed plan)
+    let discStreak = 0;
+    let maxDiscStreak = 0;
+    let discDate = null;
+    tradeList.forEach(t => {
+      if (t.followedPlan !== false) {
+        discStreak++;
+        if (discStreak === 20 && !discDate) discDate = getSafeDateStr(t.entryTime || t.date);
+      } else {
+        discStreak = 0;
+      }
+      if (discStreak > maxDiscStreak) maxDiscStreak = discStreak;
+    });
+    if (maxDiscStreak >= 20) {
+      achievements['iron-discipline'].achieved = true;
+      achievements['iron-discipline'].date = discDate;
+    }
+
+    // Sniper (PF > 2 with 50+ trades)
+    const wins = tradeList.filter(t => t.profitLoss > 0);
+    const losses = tradeList.filter(t => t.profitLoss < 0);
+    const grossProfit = wins.reduce((sum, t) => sum + t.profitLoss, 0);
+    const grossLoss = Math.abs(losses.reduce((sum, t) => sum + t.profitLoss, 0));
+    const pf = grossLoss === 0 ? grossProfit : grossProfit / grossLoss;
+    if (tradeList.length >= 50 && pf >= 2.0) {
+      achievements['sniper'].achieved = true;
+      achievements['sniper'].date = getSafeDateStr(tradeList[49].entryTime || tradeList[49].date);
+    }
+
+    // Consistency (Simplified Math)
+    const winRate = tradeList.length > 0 ? wins.length / tradeList.length : 0;
+    const pfScore = Math.min(pf, 3) / 3;
+    const consistencyScore = (winRate * 0.6 + pfScore * 0.4) * 100;
+    if (consistencyScore >= 50) { achievements['consistency-50'].achieved = true; achievements['consistency-50'].date = new Date().toISOString().split('T')[0]; }
+    if (consistencyScore >= 60) { achievements['consistency-60'].achieved = true; achievements['consistency-60'].date = new Date().toISOString().split('T')[0]; }
+    if (consistencyScore >= 70) { achievements['consistency-70'].achieved = true; achievements['consistency-70'].date = new Date().toISOString().split('T')[0]; }
+
+    // 🟢 NEW: Detailed Monthly Goal Tracker
+    const monthsMap = {};
+    tradeList.forEach(t => {
+      const d = getSafeDateStr(t.entryTime || t.date);
+      if(!d) return;
+      const month = d.slice(0, 7);
+      monthsMap[month] = (monthsMap[month] || 0) + t.profitLoss;
+    });
+
+    const achievedMonths = [];
+    Object.keys(monthsMap).forEach(m => {
+      if (monthsMap[m] >= 1000) achievedMonths.push({ month: m, pnl: monthsMap[m] });
+      if (monthsMap[m] > 0) { achievements['green-month'].achieved = true; achievements['green-month'].date = m + '-28'; }
+    });
+
+    if (achievedMonths.length > 0) {
       achievements['monthly-goal'].achieved = true;
-      achievements['monthly-goal'].date = new Date().toISOString().slice(0, 10);
+      achievements['monthly-goal'].achievedMonths = achievedMonths.sort((a,b) => b.month.localeCompare(a.month)); // Sort newest first
+      achievements['monthly-goal'].date = achievedMonths[0].month + '-01'; 
     }
 
     return achievements;
@@ -198,7 +277,7 @@ const MilestonesPage = ({ trades = [] }) => {
     let bestMonth = { month: 'N/A', profit: -Infinity };
     Object.keys(monthsMap).forEach(month => {
       if (monthsMap[month] > bestMonth.profit) {
-        bestMonth = { month: new Date(month + '-01').toLocaleString('default', { month: 'long', year: 'numeric' }), profit: monthsMap[month] };
+        bestMonth = { month: formatMonthLabel(month), profit: monthsMap[month] };
       }
     });
     if (bestMonth.profit === -Infinity) bestMonth.profit = 0;
@@ -228,7 +307,7 @@ const MilestonesPage = ({ trades = [] }) => {
   const timelineEvents = useMemo(() => {
     return Object.values(achievements)
       .filter(a => a.achieved && a.date)
-      .sort((a, b) => new Date(b.date) - new Date(a.date)); // Sort newest first
+      .sort((a, b) => new Date(b.date) - new Date(a.date)); 
   }, [achievements]);
 
   const chartData = useMemo(() => {
@@ -264,7 +343,7 @@ const MilestonesPage = ({ trades = [] }) => {
 
   const formatCurrency = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(n);
 
-  const CustomTooltip = ({ active, payload, label }) => {
+  const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
       const val = payload[0].value;
       const isNegative = val < 0;
@@ -285,6 +364,52 @@ const MilestonesPage = ({ trades = [] }) => {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }} style={{ color: '#FFF', fontFamily: 'Inter, sans-serif', maxWidth: '1200px', margin: '0 auto', paddingBottom: '40px' }}>
       
+      {/* 🟢 NEW: INTERACTIVE BADGE MODAL */}
+      <AnimatePresence>
+        {selectedBadge && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', zIndex: 100, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px' }}
+            onClick={(e) => { if(e.target === e.currentTarget) setSelectedBadge(null); }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }}
+              style={{ background: 'rgba(13,17,28,0.98)', border: '1px solid rgba(0,255,136,0.3)', borderRadius: '20px', width: '100%', maxWidth: '500px', padding: '30px', boxShadow: '0 20px 60px rgba(0,255,136,0.15)', textAlign: 'center' }}
+            >
+              <div style={{ fontSize: '4rem', marginBottom: '10px' }}>{selectedBadge.icon}</div>
+              <h2 style={{ margin: '0 0 10px 0', fontSize: '1.8rem', color: '#FFF' }}>{selectedBadge.label}</h2>
+              <p style={{ color: '#9B9A97', fontSize: '0.95rem', lineHeight: '1.6', marginBottom: '20px' }}>{selectedBadge.description}</p>
+              
+              <div style={{ display: 'inline-block', background: 'rgba(0,255,136,0.05)', border: '1px solid rgba(0,255,136,0.2)', padding: '8px 16px', borderRadius: '8px', color: '#00FF88', fontWeight: 600, fontSize: '0.85rem', marginBottom: '24px' }}>
+                Unlocked: {new Date(selectedBadge.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+              </div>
+
+              {/* Drill-down for Monthly Goals */}
+              {selectedBadge.id === 'monthly-goal' && selectedBadge.achievedMonths && (
+                <div style={{ textAlign: 'left', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', padding: '16px', border: '1px solid rgba(255,255,255,0.05)', maxHeight: '200px', overflowY: 'auto' }}>
+                  <h4 style={{ color: '#FFF', margin: '0 0 12px 0', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px' }}>🏆 Target Achieved In:</h4>
+                  {selectedBadge.achievedMonths.map(m => (
+                    <div key={m.month} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                      <span style={{ color: '#D1D5DB', fontWeight: 500 }}>{formatMonthLabel(m.month)}</span>
+                      <span style={{ color: '#00FF88', fontWeight: 800, fontFamily: 'JetBrains Mono, monospace' }}>+{formatCurrency(m.pnl)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button 
+                onClick={() => setSelectedBadge(null)} 
+                style={{ width: '100%', marginTop: '24px', padding: '12px', background: 'rgba(255,255,255,0.05)', color: '#FFF', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s' }}
+                onMouseEnter={e => e.target.style.background = 'rgba(255,255,255,0.1)'}
+                onMouseLeave={e => e.target.style.background = 'rgba(255,255,255,0.05)'}
+              >
+                Close Vault
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* HEADER */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '30px' }}>
         <div>
@@ -313,7 +438,7 @@ const MilestonesPage = ({ trades = [] }) => {
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px', marginBottom: '24px' }}>
         
-        {/* ACCOUNT GROWTH PIPELINE (SPLIT GRADIENT) */}
+        {/* ACCOUNT GROWTH PIPELINE */}
         <div style={{ background: 'rgba(13,17,28,0.95)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column' }}>
           <h3 style={{ margin: '0 0 20px 0', fontSize: '1rem', color: '#FFF', textTransform: 'uppercase', letterSpacing: '1px' }}>📈 Milestone Equity Curve</h3>
           <div style={{ flex: 1, minHeight: '300px' }}>
@@ -343,7 +468,7 @@ const MilestonesPage = ({ trades = [] }) => {
           </div>
         </div>
 
-        {/* 🟢 NEW: LIVE INTERACTIVE TIMELINE */}
+        {/* LIVE INTERACTIVE TIMELINE */}
         <div style={{ background: 'rgba(13,17,28,0.95)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', maxHeight: '420px' }}>
           <h3 style={{ margin: '0 0 20px 0', fontSize: '1rem', color: '#FFF', textTransform: 'uppercase', letterSpacing: '1px' }}>⏳ Unlock Timeline</h3>
           <div style={{ flex: 1, overflowY: 'auto', paddingRight: '10px' }}>
@@ -353,14 +478,14 @@ const MilestonesPage = ({ trades = [] }) => {
                   <motion.div 
                     key={event.id}
                     initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }}
-                    style={{ position: 'relative', paddingLeft: '24px', marginBottom: '24px' }}
+                    style={{ position: 'relative', paddingLeft: '24px', marginBottom: '24px', cursor: 'pointer' }}
+                    onClick={() => setSelectedBadge(event)} // 🟢 Click timeline to view modal
                   >
-                    {/* Glowing Node */}
                     <div style={{ position: 'absolute', left: '-6px', top: '4px', width: '10px', height: '10px', borderRadius: '50%', background: '#00FF88', boxShadow: '0 0 10px #00FF88' }} />
                     <div style={{ fontSize: '0.7rem', color: '#6B7280', fontFamily: 'JetBrains Mono, monospace', marginBottom: '4px' }}>
                       {new Date(event.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </div>
-                    <div style={{ background: 'rgba(0,255,136,0.05)', border: '1px solid rgba(0,255,136,0.15)', borderRadius: '8px', padding: '10px', display: 'inline-block', width: '100%' }}>
+                    <div style={{ background: 'rgba(0,255,136,0.05)', border: '1px solid rgba(0,255,136,0.15)', borderRadius: '8px', padding: '10px', display: 'inline-block', width: '100%', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background='rgba(0,255,136,0.1)'} onMouseLeave={e => e.currentTarget.style.background='rgba(0,255,136,0.05)'}>
                       <div style={{ color: '#FFF', fontWeight: 600, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span>{event.icon}</span> {event.label}
                       </div>
@@ -394,7 +519,6 @@ const MilestonesPage = ({ trades = [] }) => {
                     {key === 'monthlyProfit' ? `$${goal.current.toFixed(0)} / $${goal.goal}` : `${goal.current.toFixed(1)}${key === 'winRate' ? '%' : ''} / ${goal.goal}${key === 'winRate' ? '%' : ''}`}
                   </span>
                 </div>
-                {/* Sleek Neon Progress Bar */}
                 <div style={{ width: '100%', height: '6px', background: 'rgba(0,0,0,0.5)', borderRadius: '4px', overflow: 'hidden' }}>
                   <motion.div initial={{ width: 0 }} animate={{ width: `${Math.max(percent, 0)}%` }} transition={{ duration: 1, delay: 0.5 }} style={{ height: '100%', background: barColor, boxShadow: `0 0 10px ${barColor}` }} />
                 </div>
@@ -413,13 +537,16 @@ const MilestonesPage = ({ trades = [] }) => {
             return (
               <div 
                 key={badge.id} 
-                title={badge.description}
+                onClick={() => { if(isUnlocked) setSelectedBadge(achievements[badge.id]) }} // 🟢 Interactive Click added
                 style={{
                   background: isUnlocked ? 'rgba(0,255,136,0.05)' : 'rgba(0,0,0,0.4)',
                   border: `1px solid ${isUnlocked ? 'rgba(0,255,136,0.3)' : 'rgba(255,255,255,0.05)'}`,
                   borderRadius: '12px', padding: '20px 16px', textAlign: 'center', position: 'relative',
-                  transition: 'all 0.3s', filter: isUnlocked ? 'none' : 'grayscale(1)', opacity: isUnlocked ? 1 : 0.5
+                  transition: 'all 0.3s', filter: isUnlocked ? 'none' : 'grayscale(1)', opacity: isUnlocked ? 1 : 0.5,
+                  cursor: isUnlocked ? 'pointer' : 'default' // Hand cursor for unlocked
                 }}
+                onMouseEnter={e => { if(isUnlocked) { e.currentTarget.style.transform = 'scale(1.05)'; e.currentTarget.style.boxShadow = '0 0 20px rgba(0,255,136,0.2)'; } }}
+                onMouseLeave={e => { if(isUnlocked) { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = 'none'; } }}
               >
                 {isUnlocked && (
                   <div style={{ position: 'absolute', top: '-6px', right: '-6px', background: '#00FF88', color: '#000', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 'bold', boxShadow: '0 0 10px #00FF88' }}>
