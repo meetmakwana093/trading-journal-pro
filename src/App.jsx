@@ -120,6 +120,9 @@ export default function App() {
 
   const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
+  
+  // 🟢 NEW: Calendar Modal State
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(null);
 
   const parseTags = (tags) => {
     if (Array.isArray(tags)) return tags;
@@ -303,7 +306,6 @@ export default function App() {
     }
   };
 
-  // 🟢 COMPLETE SIDEBAR STRUCTURE
   const sidebarGroups = [
     {
       category: 'Overview',
@@ -350,24 +352,24 @@ export default function App() {
     { count: 0, active: true }
   ).count;
 
-  const calculateMetrics = (trades) => {
-    const total = trades.length;
+  const calculateMetrics = (tradesList) => {
+    const total = tradesList.length;
     if (total === 0) {
       return { winRate: 0, totalPnL: 0, returns: 0, profitFactor: 0, maxDrawdown: 0, avgWin: 0, avgLoss: 0, expectancy: 0 };
     }
-    const winningTrades = trades.filter(t => t.profitLoss > 0);
-    const losingTrades = trades.filter(t => t.profitLoss < 0);
+    const winningTrades = tradesList.filter(t => t.profitLoss > 0);
+    const losingTrades = tradesList.filter(t => t.profitLoss < 0);
     const winning = winningTrades.length;
     const losing = losingTrades.length;
     const winRate = (winning / total) * 100;
-    const totalPnL = trades.reduce((sum, t) => sum + t.profitLoss, 0);
+    const totalPnL = tradesList.reduce((sum, t) => sum + t.profitLoss, 0);
     const expectancy = totalPnL / total;
     const returns = (totalPnL / 10000) * 100;
     const grossProfit = winningTrades.reduce((sum, t) => sum + t.profitLoss, 0);
     const grossLoss = Math.abs(losingTrades.reduce((sum, t) => sum + t.profitLoss, 0));
     const profitFactor = grossLoss === 0 ? 0 : grossProfit / grossLoss;
 
-    const sortedTrades = [...trades].sort((a, b) => new Date(a.entryTime) - new Date(b.entryTime));
+    const sortedTrades = [...tradesList].sort((a, b) => new Date(a.entryTime) - new Date(b.entryTime));
     let cumulative = 0, peak = 0, maxDrawdown = 0;
     sortedTrades.forEach(t => {
       cumulative += t.profitLoss;
@@ -500,12 +502,108 @@ export default function App() {
     { label: 'Profit Factor', value: metrics.profitFactor, color: '#00FF88', glow: 'rgba(0,255,136,0.4)' },
   ];
 
+  // 🟢 NEW: Calculation for the Calendar Day Modal
+  const selectedDayTrades = selectedCalendarDate ? trades.filter(t => {
+    const dateStr = (t.entryTime || t.date || '').split('T')[0].split(' ')[0];
+    return dateStr === selectedCalendarDate;
+  }) : [];
+  const selectedDayMetrics = calculateMetrics(selectedDayTrades);
+
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100vw', background: '#080B14', color: '#FFF', overflow: 'hidden', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif' }}>
 
       {/* BACKGROUND EFFECTS */}
       <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse 80% 50% at 20% -10%, rgba(0,255,136,0.06) 0%, transparent 60%), radial-gradient(ellipse 60% 40% at 80% 110%, rgba(59,130,246,0.05) 0%, transparent 60%), radial-gradient(ellipse 40% 30% at 50% 50%, rgba(139,92,246,0.03) 0%, transparent 70%)' }} />
       <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0, pointerEvents: 'none', opacity: 0.03, backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")` }} />
+
+      {/* 🟢 NEW: Calendar Click Detailed Day Modal */}
+      <AnimatePresence>
+        {selectedCalendarDate && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+              backdropFilter: 'blur(8px)', zIndex: 100, display: 'flex',
+              justifyContent: 'center', alignItems: 'center', padding: '20px'
+            }}
+            onClick={(e) => { if(e.target === e.currentTarget) setSelectedCalendarDate(null); }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              style={{
+                background: 'rgba(13,17,28,0.98)', border: '1px solid rgba(0,255,136,0.2)',
+                borderRadius: '20px', width: '100%', maxWidth: '800px', maxHeight: '85vh',
+                display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.8)'
+              }}
+            >
+              <div style={{ padding: '24px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h2 style={{ margin: '0 0 4px 0', fontSize: '1.5rem', color: '#FFF' }}>Session Review</h2>
+                  <div style={{ color: '#9B9A97', fontSize: '0.9rem' }}>
+                    {new Date(selectedCalendarDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedCalendarDate(null)}
+                  style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: '#FFF', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer', fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >✕</button>
+              </div>
+              
+              <div style={{ padding: '24px', overflowY: 'auto' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
+                  <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#9B9A97', textTransform: 'uppercase', marginBottom: '6px' }}>Net P&L</div>
+                    <div style={{ fontSize: '1.8rem', fontWeight: 800, color: selectedDayMetrics.totalPnL >= 0 ? '#00FF88' : '#FF3333', fontFamily: 'JetBrains Mono, monospace' }}>
+                      {selectedDayMetrics.totalPnL >= 0 ? '+' : ''}${selectedDayMetrics.totalPnL}
+                    </div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#9B9A97', textTransform: 'uppercase', marginBottom: '6px' }}>Win Rate</div>
+                    <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#FFF', fontFamily: 'JetBrains Mono, monospace' }}>{selectedDayMetrics.winRate}%</div>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#9B9A97', textTransform: 'uppercase', marginBottom: '6px' }}>Executions</div>
+                    <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#2D9CDB', fontFamily: 'JetBrains Mono, monospace' }}>{selectedDayTrades.length}</div>
+                  </div>
+                </div>
+
+                <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem', color: '#FFF' }}>Trade Breakdown</h3>
+                <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr style={{ background: 'rgba(255,255,255,0.03)', color: '#9B9A97', textAlign: 'left' }}>
+                        <th style={{ padding: '12px 16px' }}>Symbol</th>
+                        <th style={{ padding: '12px 16px' }}>Side</th>
+                        <th style={{ padding: '12px 16px' }}>Entry</th>
+                        <th style={{ padding: '12px 16px' }}>Exit</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'right' }}>P&L ($)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedDayTrades.map((t, idx) => (
+                        <tr key={idx} style={{ borderTop: '1px solid rgba(255,255,255,0.03)' }}>
+                          <td style={{ padding: '12px 16px', fontWeight: 700 }}>{t.symbol}</td>
+                          <td style={{ padding: '12px 16px', color: t.direction === 'LONG' ? '#00FF88' : '#FF3333' }}>{t.direction}</td>
+                          <td style={{ padding: '12px 16px', color: '#D1D5DB' }}>{t.entryPrice || '-'}</td>
+                          <td style={{ padding: '12px 16px', color: '#D1D5DB' }}>{t.exitPrice || '-'}</td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: t.profitLoss >= 0 ? '#00FF88' : '#FF3333' }}>
+                            {t.profitLoss >= 0 ? '+' : ''}${t.profitLoss}
+                          </td>
+                        </tr>
+                      ))}
+                      {selectedDayTrades.length === 0 && <tr><td colSpan="5" style={{ padding: '24px', textAlign: 'center', color: '#6B7280' }}>No trades logged for this day.</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* SLIDING SIDEBAR & BACKDROP */}
       <AnimatePresence>
@@ -557,11 +655,11 @@ export default function App() {
 
               <div style={{ flex: 1, overflowY: 'auto', padding: '24px 16px' }}>
                 {sidebarGroups.map(group => (
-                  <div key={group.category} style={{ marginBottom: '28px' }}>
-                    <div style={{ fontSize: '0.65rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, padding: '0 12px', marginBottom: '10px' }}>
+                  <div key={group.category} style={{ marginBottom: '32px' }}>
+                    <div style={{ fontSize: '0.65rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, padding: '0 12px', marginBottom: '12px' }}>
                       {group.category}
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       {group.items.map(item => {
                         const isActive = activeTab === item.value;
                         return (
@@ -574,7 +672,7 @@ export default function App() {
                               padding: '10px 12px', background: isActive ? 'rgba(0, 255, 136, 0.08)' : 'transparent',
                               border: 'none', borderRadius: '8px', cursor: 'pointer',
                               color: isActive ? '#00FF88' : '#9CA3AF',
-                              fontWeight: isActive ? 600 : 500, fontSize: '0.88rem',
+                              fontWeight: isActive ? 600 : 500, fontSize: '0.9rem',
                               transition: 'background 0.2s, color 0.2s', textAlign: 'left'
                             }}
                           >
@@ -827,9 +925,10 @@ export default function App() {
                           return (
                             <motion.div
                               key={dateStr}
+                              onClick={() => setSelectedCalendarDate(dateStr)} // 🟢 Click handler added
                               whileHover={{ scale: 1.08, boxShadow: data ? (data.pnl > 0 ? '0 0 12px rgba(0,255,136,0.4)' : '0 0 12px rgba(255,51,51,0.4)') : 'none' }}
                               className={`calendar-day ${dayClass}`}
-                              style={{ transition: 'all 0.2s', borderRadius: '8px' }}
+                              style={{ transition: 'all 0.2s', borderRadius: '8px', cursor: 'pointer' }} // 🟢 Cursor pointer added
                             >
                               <div className="calendar-day-number" style={{ fontSize: '0.8rem' }}>{day}</div>
                               {data && <div className="calendar-day-pnl" style={{ fontSize: '0.6rem' }}>{formatCurrency(data.pnl)}</div>}
