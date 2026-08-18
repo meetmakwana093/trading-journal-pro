@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 
 const Analytics = ({ trades = [] }) => {
-  const [activeTab, setActiveTab] = useState('performance'); // 'performance', 'risk', 'day', 'week'
+  const [activeTab, setActiveTab] = useState('performance'); 
 
   // --- HELPER FUNCTIONS FOR DATES ---
   const getSafeDateStr = (dateInput) => {
@@ -36,7 +36,6 @@ const Analytics = ({ trades = [] }) => {
   const [selectedDay, setSelectedDay] = useState(uniqueDays[0] || '');
   const [selectedWeek, setSelectedWeek] = useState(uniqueWeeks[0] || '');
 
-  // Keep selected dropdowns synced if data changes
   useMemo(() => { if (!uniqueDays.includes(selectedDay)) setSelectedDay(uniqueDays[0] || ''); }, [uniqueDays]);
   useMemo(() => { if (!uniqueWeeks.includes(selectedWeek)) setSelectedWeek(uniqueWeeks[0] || ''); }, [uniqueWeeks]);
 
@@ -88,11 +87,18 @@ const Analytics = ({ trades = [] }) => {
     });
   };
 
+  // 🟢 FIXED: Bulletproof Date Parsing for the Weekly Bar Chart to prevent "Invalid Date"
   const generateWeeklyBarData = (tradeList) => {
     const days = { 'Mon': 0, 'Tue': 0, 'Wed': 0, 'Thu': 0, 'Fri': 0, 'Sat': 0, 'Sun': 0 };
     tradeList.forEach(t => {
-      const d = new Date((t.entryTime || t.date) + 'T00:00:00');
-      const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+      const safeStr = getSafeDateStr(t.entryTime || t.date);
+      if (!safeStr) return;
+      
+      const [y, m, d] = safeStr.split('-');
+      // By using year, month-1, and day directly, we completely bypass string parsing crashes
+      const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d), 12, 0, 0); 
+      
+      const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
       if (days[dayName] !== undefined) days[dayName] += t.profitLoss;
     });
     return Object.keys(days).map(day => ({ day, pnl: parseFloat(days[day].toFixed(2)) }));
@@ -107,7 +113,6 @@ const Analytics = ({ trades = [] }) => {
     return dataMax / (dataMax - dataMin);
   };
 
-  // Chart Sources
   const growthData = generateGrowthData(trades);
   const globalOff = getGradientOffset(growthData);
   const dayGrowthData = generateGrowthData(dayTrades);
