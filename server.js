@@ -359,6 +359,41 @@ app.get('/api/prep/:date', verifyToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/missed-trades', verifyToken, async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM missed_trades WHERE user_id = ? ORDER BY entry_time DESC', [req.user.id]);
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/missed-trades', verifyToken, async (req, res) => {
+  const { symbol, missedEntryPrice, missedExitPrice, predictedPnl, date, reason } = req.body;
+  
+  // Format Date for MySQL
+  let mysqlDate;
+  try { 
+    mysqlDate = new Date(date).toISOString().slice(0, 19).replace('T', ' '); 
+  } catch (e) { 
+    mysqlDate = new Date().toISOString().slice(0, 19).replace('T', ' '); 
+  }
+  
+  try {
+    const [result] = await pool.query(
+      `INSERT INTO missed_trades (user_id, symbol, missed_entry_price, missed_exit_price, predicted_pnl, entry_time, reason) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [req.user.id, symbol || 'UNKNOWN', missedEntryPrice || 0, missedExitPrice || 0, predictedPnl || 0, mysqlDate, reason || '']
+    );
+    const [newRow] = await pool.query('SELECT * FROM missed_trades WHERE id = ?', [result.insertId]);
+    res.json(newRow[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/missed-trades/:id', verifyToken, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM missed_trades WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+    res.json({ message: 'Deleted', id: req.params.id });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/prep', verifyToken, async (req, res) => {
   const { date, bias, readiness_score, checklist, key_levels, notes } = req.body;
   try {
