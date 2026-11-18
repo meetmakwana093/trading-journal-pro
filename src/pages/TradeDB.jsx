@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react'; // ✅ QUICK ADD: added useEffect
 import { motion, AnimatePresence } from 'framer-motion';
 
-const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateTrade }) => {
+// ✅ QUICK ADD: two new props -> autoOpenForm, onAutoOpenHandled
+const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateTrade, autoOpenForm, onAutoOpenHandled }) => {
   
   const [showForm, setShowForm] = useState(false);
   const [editingTradeId, setEditingTradeId] = useState(null); 
@@ -27,6 +28,16 @@ const TradesDB = ({ trades, playbooks = [], onAddTrade, onDeleteTrade, onUpdateT
   };
 
   const [formData, setFormData] = useState(defaultFormState);
+
+  // ✅ QUICK ADD: when arriving from the dashboard button, open a fresh add-trade form
+  useEffect(() => {
+    if (autoOpenForm) {
+      setEditingTradeId(null);
+      setFormData(defaultFormState);
+      setShowForm(true);
+      if (onAutoOpenHandled) onAutoOpenHandled();
+    }
+  }, [autoOpenForm]);
 
   const calculatedRR = useMemo(() => {
     const entry = parseFloat(formData.entryPrice);

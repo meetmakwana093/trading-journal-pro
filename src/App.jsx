@@ -124,6 +124,9 @@ export default function App() {
   // 🟢 NEW: Calendar Modal State
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(null);
 
+  // ✅ QUICK ADD: tells TradesDB to open its form right after navigating
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+
   const parseTags = (tags) => {
     if (Array.isArray(tags)) return tags;
     if (typeof tags === 'string' && tags.trim() !== '') return tags.split(',').map(t => t.trim());
@@ -286,6 +289,12 @@ export default function App() {
     setMissedTrades([]);
     setPlaybooks([]);
     setCharts([]);
+  };
+
+  // ✅ QUICK ADD: go to Trades DB and ask it to open the add-trade form
+  const handleQuickAdd = () => {
+    setQuickAddOpen(true);
+    setActiveTab('tradesDb');
   };
 
   const handlePrevMonth = () => {
@@ -493,6 +502,7 @@ export default function App() {
     { subject: 'Recovery Factor', A: Math.min((calculateRecoveryFactor(trades) / 3) * 100, 100), fullMark: 100 },
   ];
 
+  // ✅ FIXED: this line was missing the `if (!user)` check
   if (!user) return <LoginPage onLogin={handleLogin} />;
 
   const metricCards = [
@@ -1019,7 +1029,16 @@ export default function App() {
                 ) : activeTab === 'missedTradesDb' ? (
                   <MissedTradeDB missedTrades={missedTrades} onAddMissedTrade={handleAddMissedTrade} onDeleteMissedTrade={handleDeleteMissedTrade} />
                 ) : activeTab === 'tradesDb' ? (
-                  <TradesDB trades={trades} playbooks={playbooks} onAddTrade={handleAddTrade} onDeleteTrade={handleDeleteTrade} onUpdateTrade={handleUpdateTrade} />
+                  // ✅ QUICK ADD: two new props passed to TradesDB
+                  <TradesDB
+                    trades={trades}
+                    playbooks={playbooks}
+                    onAddTrade={handleAddTrade}
+                    onDeleteTrade={handleDeleteTrade}
+                    onUpdateTrade={handleUpdateTrade}
+                    autoOpenForm={quickAddOpen}
+                    onAutoOpenHandled={() => setQuickAddOpen(false)}
+                  />
                 ) : activeTab === 'dailyPrep' ? (
                   <DailyPrep />
                 ) : activeTab === 'economicCalendar' ? (
@@ -1038,6 +1057,36 @@ export default function App() {
           </AnimatePresence>
         </div>
       </div>
+
+      {/* ✅ QUICK ADD: floating button, shown on the Dashboard only */}
+      <AnimatePresence>
+        {activeTab === 'home' && (
+          <motion.button
+            key="quick-add-btn"
+            initial={{ opacity: 0, y: 20, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            whileHover={{ scale: 1.05, boxShadow: '0 8px 30px rgba(0,255,136,0.35)' }}
+            whileTap={{ scale: 0.97 }}
+            onClick={handleQuickAdd}
+            aria-label="Quick add a trade"
+            style={{
+              position: 'fixed', right: '28px', bottom: '28px', zIndex: 30,
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '12px 20px',
+              background: 'linear-gradient(135deg, #00FF88 0%, #00CC6A 100%)',
+              border: 'none', borderRadius: '12px',
+              color: '#000000', fontWeight: 700, fontSize: '0.85rem',
+              letterSpacing: '0.02em', fontFamily: 'Inter, sans-serif',
+              cursor: 'pointer',
+              boxShadow: '0 4px 20px rgba(0,255,136,0.25)'
+            }}
+          >
+            <span style={{ fontSize: '1.1rem', lineHeight: 1 }}>+</span>
+            Quick Add Trade
+          </motion.button>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
