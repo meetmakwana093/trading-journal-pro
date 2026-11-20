@@ -18,21 +18,22 @@ const authorize = (requiredRole) => {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthenticated' });
       }
-      if (requiredRole === 'admin') {
-        // Admin can access admin routes
-        if (req.user.role !== 'admin') {
+      // requiredRole: 0 = user, 1 = admin
+      if (requiredRole === 1) {
+        // Admin route: only users with role=1 (admin) can access
+        if (req.user.role !== 1) {
           return res.status(403).json({ error: 'Access denied: admin role required' });
         }
-      } else if (requiredRole === 'user') {
-        // User routes: allow if user has 'user' role OR admin role
+      } else if (requiredRole === 0) {
+        // User route: allow if role=0 (user) OR role=1 (admin)
         // This lets admins manage users while regular users access their own data
-        if (req.user.role !== 'user' && req.user.role !== 'admin') {
+        if (req.user.role !== 0 && req.user.role !== 1) {
           return res.status(403).json({ error: 'Access denied: user role required' });
         }
       } else {
-        // Specific role check
+        // Specific role check with integer comparison
         if (req.user.role !== requiredRole) {
-          return res.status(403).json({ error: `Access denied: requires ${requiredRole} role` });
+          return res.status(403).json({ error: `Access denied: requires role ${requiredRole}` });
         }
       }
       next();
@@ -50,7 +51,10 @@ const pool = mysql.createPool({
   port: 3306,
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  connectionTimeout: 15000,      // 15 seconds before giving up on acquiring a connection
+  idleTimeout: 12000,           // 12 seconds of inactivity before releasing a connection
+  acquireTimeout: 15000         // 15 seconds to wait for connection from pool
 });
 
 pool.getConnection()
@@ -63,7 +67,7 @@ pool.query(`
     id INT AUTO_INCREMENT PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
-    role VARCHAR(50) DEFAULT 'user',
+    role INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )
 `).catch(() => {});
@@ -208,9 +212,12 @@ app.post('/api/auth/register', async (req, res) => {
     const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
     if (existing.length > 0) return res.status(400).json({ error: 'Email already registered' });
     const hashedPassword = await bcrypt.hash(password, 10);
-    const [result] = await pool.query('INSERT INTO users (email, password, role) VALUES (?, ?, ?)', [email, hashedPassword, 'user']);
-    const token = jwt.sign({ id: result.insertId, email, role: 'user' }, JWT_SECRET, { expiresIn: '30d' });
-    res.json({ token, user: { id: result.insertId, email, role: 'user' } });
+    // Special: meetmakwana093@gmail.com gets admin role (1), all others get regular user (0)
+    const isAdminEmail = email === 'meetmakwana093@gmail.com';
+    const roleValue = isAdminEmail ? 1 : 0;
+    const [result] = await pool.query('INSERT INTO users (email, password, role) VALUES (?, ?, ?)', [email, hashedPassword, roleValue]);
+    const token = jwt.sign({ id: result.insertId, email, role: roleValue }, JWT_SECRET, { expiresIn: '30d' });
+    res.json({ token, user: { id: result.insertId, email, role: roleValue } });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -223,8 +230,8 @@ app.post('/api/auth/login', async (req, res) => {
     const user = rows[0];
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ error: 'Invalid email or password' });
-    const token = jwt.sign({ id: user.id, email: user.email, role: user.role || 'user' }, JWT_SECRET, { expiresIn: '30d' });
-    res.json({ token, user: { id: user.id, email: user.email, role: user.role || 'user' } });
+    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '30d' });
+    res.json({ token, user: { id: user.id, email: user.email, role: user.role } });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
