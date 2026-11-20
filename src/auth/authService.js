@@ -6,7 +6,11 @@ export const register = async (email, password) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password })
   });
-  return res.json();
+  const data = await res.json();
+  if (data.token && data.user) {
+    saveAuth(data.token, data.user);
+  }
+  return data;
 };
 
 export const login = async (email, password) => {
@@ -15,7 +19,11 @@ export const login = async (email, password) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password })
   });
-  return res.json();
+  const data = await res.json();
+  if (data.token && data.user) {
+    saveAuth(data.token, data.user);
+  }
+  return data;
 };
 
 export const getToken = () => localStorage.getItem('tj_token');

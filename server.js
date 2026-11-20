@@ -11,6 +11,37 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 const JWT_SECRET = process.env.JWT_SECRET || 'TRADING_JWT_SECRET_2024';
 
+// Role-based access control middleware
+const authorize = (requiredRole) => {
+  return (req, res, next) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Unauthenticated' });
+      }
+      if (requiredRole === 'admin') {
+        // Admin can access admin routes
+        if (req.user.role !== 'admin') {
+          return res.status(403).json({ error: 'Access denied: admin role required' });
+        }
+      } else if (requiredRole === 'user') {
+        // User routes: allow if user has 'user' role OR admin role
+        // This lets admins manage users while regular users access their own data
+        if (req.user.role !== 'user' && req.user.role !== 'admin') {
+          return res.status(403).json({ error: 'Access denied: user role required' });
+        }
+      } else {
+        // Specific role check
+        if (req.user.role !== requiredRole) {
+          return res.status(403).json({ error: `Access denied: requires ${requiredRole} role` });
+        }
+      }
+      next();
+    } catch (err) {
+      res.status(500).json({ error: 'Authorization middleware error' });
+    }
+  };
+};
+
 const pool = mysql.createPool({
   host: '103.212.121.69',
   user: 'trade_journal_user',
@@ -32,6 +63,7 @@ pool.query(`
     id INT AUTO_INCREMENT PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
+    role VARCHAR(50) DEFAULT 'user',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )
 `).catch(() => {});
@@ -176,9 +208,9 @@ app.post('/api/auth/register', async (req, res) => {
     const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
     if (existing.length > 0) return res.status(400).json({ error: 'Email already registered' });
     const hashedPassword = await bcrypt.hash(password, 10);
-    const [result] = await pool.query('INSERT INTO users (email, password) VALUES (?, ?)', [email, hashedPassword]);
-    const token = jwt.sign({ id: result.insertId, email }, JWT_SECRET, { expiresIn: '30d' });
-    res.json({ token, user: { id: result.insertId, email } });
+    const [result] = await pool.query('INSERT INTO users (email, password, role) VALUES (?, ?, ?)', [email, hashedPassword, 'user']);
+    const token = jwt.sign({ id: result.insertId, email, role: 'user' }, JWT_SECRET, { expiresIn: '30d' });
+    res.json({ token, user: { id: result.insertId, email, role: 'user' } });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -191,20 +223,20 @@ app.post('/api/auth/login', async (req, res) => {
     const user = rows[0];
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ error: 'Invalid email or password' });
-    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '30d' });
-    res.json({ token, user: { id: user.id, email: user.email } });
+    const token = jwt.sign({ id: user.id, email: user.email, role: user.role || 'user' }, JWT_SECRET, { expiresIn: '30d' });
+    res.json({ token, user: { id: user.id, email: user.email, role: user.role || 'user' } });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // PLAYBOOKS
-app.get('/api/playbooks', verifyToken, async (req, res) => {
+app.get('/api/playbooks', verifyToken, authorize('user'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM playbooks WHERE user_id = ? ORDER BY created_at DESC', [req.user.id]);
     res.json(rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/playbooks', verifyToken, async (req, res) => {
+app.post('/api/playbooks', verifyToken, authorize('user'), async (req, res) => {
   const { name, timeframe, description, rules } = req.body;
   try {
     const [result] = await pool.query(
@@ -216,22 +248,30 @@ app.post('/api/playbooks', verifyToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete('/api/playbooks/:id', verifyToken, async (req, res) => {
+app.delete('/api/playbooks/:id', verifyToken, authorize('user'), async (req, res) => {
   try {
     await pool.query('DELETE FROM playbooks WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
     res.json({ message: 'Deleted' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Admin: View all playbooks regardless of user
+app.get('/api/admin/playbooks', verifyToken, authorize('admin'), async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM playbooks ORDER BY created_at DESC');
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // TRADES
-app.get('/api/trades', verifyToken, async (req, res) => {
+app.get('/api/trades', verifyToken, authorize('user'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM trades WHERE user_id = ? ORDER BY entry_time DESC', [req.user.id]);
     res.json(rows.map(mapDBToReact));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/trades', verifyToken, async (req, res) => {
+app.post('/api/trades', verifyToken, authorize('user'), async (req, res) => {
   const { symbol, entryPrice, exitPrice, stopLoss, profitLoss, riskReward, playbookId, entryTime, session, direction, followedPlan, rating, mistakes, wentRight, entryWindow, model, positiveTags, negativeTags, account, be } = req.body;
   let mysqlEntryTime;
   try { mysqlEntryTime = new Date(entryTime).toISOString().slice(0, 19).replace('T', ' '); } 
@@ -249,7 +289,7 @@ app.post('/api/trades', verifyToken, async (req, res) => {
 });
 
 // BULK TRADES IMPORT
-app.post('/api/trades/bulk', verifyToken, async (req, res) => {
+app.post('/api/trades/bulk', verifyToken, authorize('user'), async (req, res) => {
   const { trades } = req.body;
   if (!Array.isArray(trades) || trades.length === 0) {
     return res.status(400).json({ error: 'No trades provided' });
@@ -259,7 +299,7 @@ app.post('/api/trades/bulk', verifyToken, async (req, res) => {
     let mysqlEntryTime;
     try { mysqlEntryTime = new Date(t.entryTime || t.date).toISOString().slice(0, 19).replace('T', ' '); }
     catch(e) { mysqlEntryTime = new Date().toISOString().slice(0, 19).replace('T', ' '); }
-    
+
     return [
       t.symbol ? t.symbol.toUpperCase().substring(0, 95) : 'UNKNOWN', // Enforce strict safe limits
       parseFloat(t.entryPrice) || 0,
@@ -287,12 +327,12 @@ app.post('/api/trades/bulk', verifyToken, async (req, res) => {
 
   try {
     const query = `
-      INSERT INTO trades 
+      INSERT INTO trades
       (symbol, entry_price, exit_price, stop_loss, profit_loss, risk_reward, playbook_id, entry_time, session, direction, followed_plan, rating, mistakes, went_right, entry_window, model, positive_tags, negative_tags, account, be, user_id)
       VALUES ?
     `;
     await pool.query(query, [values]);
-    
+
     const [rows] = await pool.query('SELECT * FROM trades WHERE user_id = ? ORDER BY entry_time DESC', [req.user.id]);
     res.json({ message: `Successfully imported ${trades.length} trades`, trades: rows.map(mapDBToReact) });
   } catch (err) {
@@ -300,14 +340,14 @@ app.post('/api/trades/bulk', verifyToken, async (req, res) => {
   }
 });
 
-app.delete('/api/trades/:id', verifyToken, async (req, res) => {
+app.delete('/api/trades/:id', verifyToken, authorize('user'), async (req, res) => {
   try {
     await pool.query('DELETE FROM trades WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
     res.json({ message: 'Deleted', id: req.params.id });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/trades/:id', verifyToken, async (req, res) => {
+app.put('/api/trades/:id', verifyToken, authorize('user'), async (req, res) => {
   const { symbol, entryPrice, exitPrice, stopLoss, profitLoss, riskReward, playbookId, entryTime, session, direction, followedPlan, rating, mistakes, wentRight, entryWindow, model, positiveTags, negativeTags, account, be } = req.body;
   let mysqlEntryTime;
   try { mysqlEntryTime = new Date(entryTime).toISOString().slice(0, 19).replace('T', ' '); } catch (e) { mysqlEntryTime = new Date().toISOString().slice(0, 19).replace('T', ' '); }
@@ -321,15 +361,23 @@ app.put('/api/trades/:id', verifyToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Admin: View all trades (without sensitive data filtering)
+app.get('/api/admin/trades', verifyToken, authorize('admin'), async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT id, symbol, entry_price, exit_price, profit_loss, entry_time, session, direction, followed_plan, rating, mistakes, went_right, entry_window, model, account, be FROM trades ORDER BY entry_time DESC');
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // CHARTS
-app.get('/api/charts', verifyToken, async (req, res) => {
+app.get('/api/charts', verifyToken, authorize('user'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM chart_gallery WHERE user_id = ? ORDER BY date DESC', [req.user.id]);
     res.json(rows.map(mapChartDBToReact));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/charts', verifyToken, async (req, res) => {
+app.post('/api/charts', verifyToken, authorize('user'), async (req, res) => {
   const { symbol, setupName, date, imageUrl, pnl, mistakes, lessons } = req.body;
   let mysqlDate;
   try { mysqlDate = new Date(date).toISOString().slice(0, 19).replace('T', ' '); } catch (e) { mysqlDate = new Date().toISOString().slice(0, 19).replace('T', ' '); }
@@ -343,7 +391,7 @@ app.post('/api/charts', verifyToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete('/api/charts/:id', verifyToken, async (req, res) => {
+app.delete('/api/charts/:id', verifyToken, authorize('user'), async (req, res) => {
   try {
     await pool.query('DELETE FROM chart_gallery WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
     res.json({ message: 'Deleted', id: req.params.id });
@@ -351,7 +399,7 @@ app.delete('/api/charts/:id', verifyToken, async (req, res) => {
 });
 
 // PRE-MARKET PREP
-app.get('/api/prep/:date', verifyToken, async (req, res) => {
+app.get('/api/prep/:date', verifyToken, authorize('user'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM premarket_prep WHERE user_id = ? AND date = ?', [req.user.id, req.params.date]);
     if (rows.length === 0) return res.json(null);
@@ -359,24 +407,24 @@ app.get('/api/prep/:date', verifyToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/missed-trades', verifyToken, async (req, res) => {
+app.get('/api/missed-trades', verifyToken, authorize('user'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM missed_trades WHERE user_id = ? ORDER BY entry_time DESC', [req.user.id]);
     res.json(rows);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/missed-trades', verifyToken, async (req, res) => {
+app.post('/api/missed-trades', verifyToken, authorize('user'), async (req, res) => {
   const { symbol, missedEntryPrice, missedExitPrice, predictedPnl, date, reason } = req.body;
-  
+
   // Format Date for MySQL
   let mysqlDate;
-  try { 
-    mysqlDate = new Date(date).toISOString().slice(0, 19).replace('T', ' '); 
-  } catch (e) { 
-    mysqlDate = new Date().toISOString().slice(0, 19).replace('T', ' '); 
+  try {
+    mysqlDate = new Date(date).toISOString().slice(0, 19).replace('T', ' ');
+  } catch (e) {
+    mysqlDate = new Date().toISOString().slice(0, 19).replace('T', ' ');
   }
-  
+
   try {
     const [result] = await pool.query(
       `INSERT INTO missed_trades (user_id, symbol, missed_entry_price, missed_exit_price, predicted_pnl, entry_time, reason) VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -387,14 +435,14 @@ app.post('/api/missed-trades', verifyToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.delete('/api/missed-trades/:id', verifyToken, async (req, res) => {
+app.delete('/api/missed-trades/:id', verifyToken, authorize('user'), async (req, res) => {
   try {
     await pool.query('DELETE FROM missed_trades WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
     res.json({ message: 'Deleted', id: req.params.id });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/prep', verifyToken, async (req, res) => {
+app.post('/api/prep', verifyToken, authorize('user'), async (req, res) => {
   const { date, bias, readiness_score, checklist, key_levels, notes } = req.body;
   try {
     await pool.query(
@@ -411,7 +459,7 @@ app.post('/api/prep', verifyToken, async (req, res) => {
 });
 
 // USER SETTINGS
-app.get('/api/settings', verifyToken, async (req, res) => {
+app.get('/api/settings', verifyToken, authorize('user'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM user_settings WHERE user_id = ?', [req.user.id]);
     if (rows.length === 0) {
@@ -427,7 +475,7 @@ app.get('/api/settings', verifyToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/settings', verifyToken, async (req, res) => {
+app.post('/api/settings', verifyToken, authorize('user'), async (req, res) => {
   const { starting_balance, max_daily_loss, risk_per_trade_percent, default_session, default_currency } = req.body;
   try {
     await pool.query(
