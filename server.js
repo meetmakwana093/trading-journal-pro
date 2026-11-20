@@ -3,6 +3,10 @@ import cors from 'cors';
 import mysql from 'mysql2/promise';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 const app = express();
 app.use(cors());
@@ -10,6 +14,26 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 const JWT_SECRET = process.env.JWT_SECRET || 'TRADING_JWT_SECRET_2024';
+
+// Database configuration from environment variables
+const dbConfig = {
+  host: process.env.DB_HOST || '103.212.121.69',
+  user: process.env.DB_USER || 'trade_journal_user',
+  password: process.env.DB_PASSWORD || 'MySql@122333',
+  database: process.env.DB_NAME || 'trade_journal',
+  port: process.env.DB_PORT || 3306,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+  connectionTimeout: 15000,
+  idleTimeout: 12000,
+  acquireTimeout: 15000,
+  // Additional stability options
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 0,
+  reconnect: true,
+  maxRetries: 3
+};
 
 // Role-based access control middleware
 const authorize = (requiredRole) => {
@@ -43,23 +67,84 @@ const authorize = (requiredRole) => {
   };
 };
 
-const pool = mysql.createPool({
-  host: '103.212.121.69',
-  user: 'trade_journal_user',
-  password: 'MySql@122333',
-  database: 'trade_journal',
-  port: 3306,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-  connectionTimeout: 15000,      // 15 seconds before giving up on acquiring a connection
-  idleTimeout: 12000,           // 12 seconds of inactivity before releasing a connection
-  acquireTimeout: 15000         // 15 seconds to wait for connection from pool
+const pool = mysql.createPool(dbConfig);
+
+// Test database connection on startup with detailed logging
+const testDbConnection = async () => {
+  try {
+    const connection = await pool.getConnection();
+    console.log('✅ Successfully connected to MySQL database!');
+    console.log(`   Host: ${dbConfig.host}`);
+    console.log(`   Database: ${dbConfig.database}`);
+    console.log(`   User: ${dbConfig.user}`);
+    connection.release();
+    return true;
+  } catch (err) {
+    console.error('❌ Database connection error:');
+    console.error(`   Host: ${dbConfig.host}`);
+    console.error(`   Database: ${dbConfig.database}`);
+    console.error(`   Error: ${err.message}`);
+    console.error(`   Code: ${err.code}`);
+    console.error(`   Stack: ${err.stack}`);
+    return false;
+  }
+};
+
+testDbConnection();
+
+// Handle pool errors gracefully
+pool.on('error', (err) => {
+  console.error('❌ MySQL pool error:', err.code, err.message);
+  if (err.code === 'PROTOCOL_CONNECTION_LOST') {
+    console.log('🔄 Connection lost, attempting to reconnect...');
+  } else if (err.code === 'ER_CON_COUNT_ERROR') {
+    console.log('⚠️ Too many connections');
+  } else if (err.code === 'ECONNREFUSED') {
+    console.log('❌ Connection refused - check if MySQL server is running');
+  }
 });
 
-pool.getConnection()
-  .then(() => console.log('✅ Successfully connected to MySQL database!'))
-  .catch(err => console.error('❌ Database connection error', err.stack));
+// Health check endpoint to test database connectivity
+app.get('/api/health', async (req, res) => {
+  try {
+    const connection = await pool.getConnection();
+    await connection.ping();
+    connection.release();
+    res.json({
+      status: 'ok',
+      database: 'connected',
+      host: dbConfig.host,
+      database: dbConfig.database,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    res.status(503).json({
+      status: 'error',
+      database: 'disconnected',
+      error: err.message,
+      code: err.code,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Test database endpoint with simple query
+app.get('/api/test-db', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT 1 as test, NOW() as server_time');
+    res.json({
+      success: true,
+      data: rows[0],
+      message: 'Database query successful'
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+      code: err.code
+    });
+  }
+});
 
 // Auto-create database tables
 pool.query(`
